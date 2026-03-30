@@ -1,5 +1,5 @@
 app     := "enotes"
-release := "build/macos/Build/Products/Release/" + app + ".app"
+release := "build/macos/Build/Products/Release/" + app + ".app/"
 install := "/Applications/" + app + ".app"
 
 # 列出所有可用命令

@@ -4,17 +4,15 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:re_editor/re_editor.dart';
-import 'package:re_highlight/languages/markdown.dart';
-import 'package:re_highlight/styles/atom-one-dark.dart';
-import 'package:re_highlight/styles/atom-one-light.dart';
 
 import '../../../core/constants/layout_constants.dart';
+import '../../editor/controllers/markdown_controller.dart';
+import '../../editor/widgets/markdown_editor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/note.dart';
 import '../providers/notes_provider.dart';
 
-/// A note card with fully inline editing via [CodeEditor].
+/// A note card with fully inline editing via [MarkdownEditor].
 ///
 /// - ESC unfocuses the editor.
 /// - No timestamp is shown in the header by default.
@@ -39,7 +37,7 @@ class NoteCard extends StatefulWidget {
 }
 
 class _NoteCardState extends State<NoteCard> {
-  late final CodeLineEditingController _controller;
+  late final MarkdownController _controller;
   late final FocusNode _focusNode;
   Timer? _saveTimer;
   bool _focused = false;
@@ -51,7 +49,7 @@ class _NoteCardState extends State<NoteCard> {
   void initState() {
     super.initState();
     _contentForHeight = widget.note.content;
-    _controller = CodeLineEditingController.fromText(widget.note.content);
+    _controller = MarkdownController(text: widget.note.content);
     _focusNode = FocusNode(onKeyEvent: _handleKeyEvent)
       ..addListener(_onFocusChanged);
     _controller.addListener(_onTextChanged);
@@ -178,7 +176,7 @@ class _NoteCardState extends State<NoteCard> {
         ),
         child: Stack(
           children: [
-            Positioned.fill(child: _buildEditor(isDark)),
+            Positioned.fill(child: _buildEditor()),
             // ⋯ button floats at top-right; zero layout impact.
             Positioned(
               top: 0,
@@ -196,31 +194,11 @@ class _NoteCardState extends State<NoteCard> {
     );
   }
 
-  Widget _buildEditor(bool isDark) {
-    return CodeEditor(
+  Widget _buildEditor() {
+    return MarkdownEditor(
       controller: _controller,
       focusNode: _focusNode,
-      wordWrap: true,
-      autofocus: false,
       hint: 'Start writing…',
-      style: CodeEditorStyle(
-        fontSize: 14,
-        fontHeight: 1.6,
-        backgroundColor: Colors.transparent,
-        codeTheme: CodeHighlightTheme(
-          languages: {'markdown': CodeHighlightThemeMode(mode: langMarkdown)},
-          theme: isDark ? atomOneDarkTheme : atomOneLightTheme,
-        ),
-      ),
-      shortcutOverrideActions: {
-        CodeShortcutSaveIntent: CallbackAction<CodeShortcutSaveIntent>(
-          onInvoke: (_) => _flushSave(),
-        ),
-      },
-      scrollbarBuilder: (context, child, details) => child,
-      verticalScrollbarWidth: 0,
-      horizontalScrollbarHeight: 0,
-      indicatorBuilder: null,
     );
   }
 }
@@ -605,7 +583,7 @@ abstract final class _NoteCardHeight {
         style: const TextStyle(
           fontSize: _fontSize,
           height: _lineHeightMult,
-          fontFamily: 'monospace',
+          // No fontFamily: estimating with the same system font the editor uses.
         ),
       ),
       textDirection: TextDirection.ltr,
