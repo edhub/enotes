@@ -9,8 +9,7 @@ class TimeColumnData {
     required this.bucketKey,
     required this.group,
     required this.label,
-    required this.pinnedNotes,
-    required this.regularNotes,
+    required this.notes,
     required this.sortOrder,
   });
 
@@ -22,16 +21,13 @@ class TimeColumnData {
   /// Human-readable header label ("Today", "Last Week", "2026 W11").
   final String label;
 
-  /// Pinned notes sorted by pinnedOrder descending (most recently pinned first).
-  final List<Note> pinnedNotes;
-
-  /// Regular notes in original insertion order (stable — never re-sorted).
-  final List<Note> regularNotes;
+  /// Active notes in original insertion order (stable — never re-sorted).
+  final List<Note> notes;
 
   /// Lower value = more recent = rendered further left.
   final int sortOrder;
 
-  int get totalCount => pinnedNotes.length + regularNotes.length;
+  int get totalCount => notes.length;
 }
 
 /// Pure-function helpers for time grouping. No state.
@@ -122,7 +118,6 @@ abstract final class TimeGroupHelper {
   static int _isoWeekSortOrder(String key, {DateTime? now}) {
     final monday = _parseWeekKey(key);
     if (monday == null) return 999999;
-    // More recent Monday = smaller daysAgo = smaller sortOrder (but always > 3)
     final daysAgo = (now?.toLocal() ?? DateTime.now()).difference(monday).inDays;
     return 4 + daysAgo;
   }

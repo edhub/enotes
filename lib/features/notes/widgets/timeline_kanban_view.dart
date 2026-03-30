@@ -7,13 +7,16 @@ import '../../../core/constants/layout_constants.dart';
 import '../providers/notes_provider.dart';
 import 'draft_column.dart';
 import 'time_column.dart';
+import 'trash_column.dart';
 
 /// Root layout widget.
 ///
 /// Horizontal scroll contains all columns side by side.
-/// Each column owns its own vertical [ScrollController].
+/// Each column owns its own vertical [ScrollController] (via [CustomScrollView]).
 /// Shift + mouse-wheel is captured at this level and forwarded to the
 /// horizontal [ScrollController].
+///
+/// Columns: Draft | Today | Yesterday | … | Recently Deleted
 class TimelineKanbanView extends StatefulWidget {
   const TimelineKanbanView({super.key});
 
@@ -53,9 +56,8 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
     );
   }
 
-  /// Forwards a vertical scroll delta to the horizontal controller.
-  /// Called when Shift is held while the mouse wheel fires.
   void _handleShiftScroll(double dy) {
+    if (!_hScroll.hasClients) return;
     final target = (_hScroll.offset + dy).clamp(
       _hScroll.position.minScrollExtent,
       _hScroll.position.maxScrollExtent,
@@ -122,6 +124,7 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
             ],
           ),
         ),
+        TrashColumn(availableHeight: availH),
         const SizedBox(width: LayoutConstants.pageHPad),
       ],
     );

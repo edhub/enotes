@@ -3,7 +3,8 @@
 abstract final class LayoutConstants {
   // Column widths
   static const double draftColumnWidth = 600;
-  static const double timeColumnWidth = 500;
+  static const double timeColumnWidth = 450;
+  static const double trashColumnWidth = 400;
 
   // Spacing
   static const double columnGap = 20;
@@ -18,9 +19,8 @@ abstract final class LayoutConstants {
   static const double cardBorderRadius = 12;
   static const double cardMarginBottom = 12;
 
-  // Draft
-  /// Maximum number of simultaneous draft notes.
-  static const int maxDraftNotes = 3;
+  /// Number of permanent draft slots (always present, like tabs).
+  static const int maxDraftNotes = 5;
 
   // Jump-to-today button: appears after scrolling past this offset
   static const double jumpButtonThreshold = draftColumnWidth + columnGap;

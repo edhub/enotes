@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/languages/markdown.dart';
@@ -15,11 +16,10 @@ import '../providers/notes_provider.dart';
 
 /// A note card with fully inline editing via [CodeEditor].
 ///
-/// Design principle: "展示即编辑" — clicking the content area starts typing
-/// immediately. No modal dialog is ever opened for editing.
-///
-/// Auto-saves 600ms after the last keystroke, or immediately on focus loss
-/// and Cmd+S.
+/// - ESC unfocuses the editor.
+/// - No timestamp is shown in the header by default.
+/// - On hover/focus a ⋯ button appears; tapping it opens a popover with
+///   timestamps and (for non-draft cards) a "Move to Trash" action.
 class NoteCard extends StatefulWidget {
   const NoteCard({
     super.key,
@@ -32,8 +32,6 @@ class NoteCard extends StatefulWidget {
   final Note note;
   final bool isDraftView;
   final double columnWidth;
-
-  /// Minimum card height (used for draft cards to fill the column).
   final double? minHeight;
 
   @override
@@ -46,15 +44,7 @@ class _NoteCardState extends State<NoteCard> {
   Timer? _saveTimer;
   bool _focused = false;
   bool _hovered = false;
-
-  /// Guard against our own programmatic controller updates
-  /// triggering the auto-save listener.
   bool _updatingController = false;
-
-  /// Tracks current text for height calculation.
-  /// Updated via setState in [_onTextChanged] so AnimatedContainer resizes
-  /// as the user types — without a ValueListenableBuilder, which fires during
-  /// CodeEditor.initState and causes a "setState during build" crash.
   late String _contentForHeight;
 
   @override
@@ -62,10 +52,10 @@ class _NoteCardState extends State<NoteCard> {
     super.initState();
     _contentForHeight = widget.note.content;
     _controller = CodeLineEditingController.fromText(widget.note.content);
-    _focusNode = FocusNode()..addListener(_onFocusChanged);
+    _focusNode = FocusNode(onKeyEvent: _handleKeyEvent)
+      ..addListener(_onFocusChanged);
     _controller.addListener(_onTextChanged);
 
-    // Auto-focus if this card was just created via addNote.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final provider = context.read<NotesProvider>();
@@ -79,7 +69,6 @@ class _NoteCardState extends State<NoteCard> {
   @override
   void didUpdateWidget(NoteCard old) {
     super.didUpdateWidget(old);
-    // Sync only when content changed externally (not from our own save).
     if (widget.note.content != old.note.content &&
         widget.note.content != _controller.text) {
       _updatingController = true;
@@ -101,7 +90,17 @@ class _NoteCardState extends State<NoteCard> {
     super.dispose();
   }
 
-  // ── Listeners ──────────────────────────────────────────────────────────────
+  // ── Key / focus / text listeners ───────────────────────────────────────────
+
+  /// ESC → unfocus the editor.
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      node.unfocus();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
 
   void _onFocusChanged() {
     setState(() => _focused = _focusNode.hasFocus);
@@ -136,8 +135,6 @@ class _NoteCardState extends State<NoteCard> {
 
     final borderColor = _focused
         ? Theme.of(context).colorScheme.primary
-        : widget.note.isPinned
-        ? (nc?.cardBorderPinned ?? Colors.indigo)
         : (nc?.cardBorder ?? Colors.grey.shade200);
 
     final bgColor = widget.isDraftView
@@ -158,13 +155,8 @@ class _NoteCardState extends State<NoteCard> {
         height: height,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(
-            LayoutConstants.cardBorderRadius,
-          ),
-          border: Border.all(
-            color: borderColor,
-            width: 1.0,
-          ),
+          borderRadius: BorderRadius.circular(LayoutConstants.cardBorderRadius),
+          border: Border.all(color: borderColor, width: 1.0),
           boxShadow: (_focused || _hovered)
               ? [
                   BoxShadow(
@@ -185,6 +177,7 @@ class _NoteCardState extends State<NoteCard> {
               note: widget.note,
               hovered: _hovered,
               focused: _focused,
+              isDraftView: widget.isDraftView,
             ),
             const SizedBox(height: 8),
             Expanded(child: _buildEditor(isDark)),
@@ -215,213 +208,448 @@ class _NoteCardState extends State<NoteCard> {
           onInvoke: (_) => _flushSave(),
         ),
       },
+      scrollbarBuilder: (context, child, details) => child,
+      verticalScrollbarWidth: 0,
+      horizontalScrollbarHeight: 0,
       indicatorBuilder: null,
     );
   }
 }
 
-// ── Header ────────────────────────────────────────────────────────────────────
+// ── Card header ───────────────────────────────────────────────────────────────
 
+/// Header row: empty left side + ⋯ info button (visible on hover or focus).
+/// No timestamp is shown here — timestamps are inside the info popover.
 class _CardHeader extends StatelessWidget {
   const _CardHeader({
     required this.note,
     required this.hovered,
     required this.focused,
+    required this.isDraftView,
   });
 
   final Note note;
   final bool hovered;
   final bool focused;
+  final bool isDraftView;
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        if (note.isPinned) ...[
-          Icon(
-            Icons.push_pin_rounded,
-            size: 13,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 4),
-        ],
-        Text(
-          _formatTime(note.updatedAt.toLocal()),
-          style: Theme.of(context).textTheme.labelSmall,
-        ),
         const Spacer(),
-        AnimatedOpacity(
-          opacity: (hovered || focused) ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 150),
-          child: IgnorePointer(
-            ignoring: !(hovered || focused),
-            child: _ActionRow(note: note),
+        // Pass hovered/focused INTO _InfoButton so it can place AnimatedOpacity
+        // INSIDE CompositedTransformTarget — never outside it.
+        _InfoButton(
+          note: note,
+          isDraftView: isDraftView,
+          hovered: hovered,
+          focused: focused,
+        ),
+      ],
+    );
+  }
+}
+
+// ── Global note-info menu (singleton OverlayEntry) ───────────────────────────
+//
+// Only one info popover exists at any time, inserted directly into the root
+// Overlay so it is completely independent of any note card's focus / hover
+// state.  Clicking outside the popover, or selecting an action, dismisses it.
+
+abstract final class _NoteInfoMenu {
+  static OverlayEntry? _entry;
+  static String? _noteId;
+
+  static bool isShowingFor(String id) => _entry != null && _noteId == id;
+
+  /// Opens the menu anchored to [link].  If already open for the same note,
+  /// toggles it closed instead.
+  static void show({
+    required BuildContext context,
+    required String noteId,
+    required LayerLink link,
+    required Note note,
+    required bool isDraftView,
+  }) {
+    if (isShowingFor(noteId)) {
+      dismiss();
+      return;
+    }
+    dismiss(); // close any previously open menu
+    _noteId = noteId;
+    _entry = OverlayEntry(
+      builder: (ctx) => _NoteInfoOverlay(
+        link: link,
+        note: note,
+        isDraftView: isDraftView,
+        onDismiss: dismiss,
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(_entry!);
+  }
+
+  static void dismiss() {
+    _entry?.remove();
+    _entry = null;
+    _noteId = null;
+  }
+}
+
+// ── Info button (trigger) ─────────────────────────────────────────────────────
+
+class _InfoButton extends StatefulWidget {
+  const _InfoButton({
+    required this.note,
+    required this.isDraftView,
+    required this.hovered,
+    required this.focused,
+  });
+
+  final Note note;
+  final bool isDraftView;
+  final bool hovered;
+  final bool focused;
+
+  @override
+  State<_InfoButton> createState() => _InfoButtonState();
+}
+
+class _InfoButtonState extends State<_InfoButton> {
+  // Each button owns a LayerLink used both for positioning the follower and
+  // as the TapRegion groupId so clicking the button never fires onTapOutside.
+  final _link = LayerLink();
+
+  @override
+  void dispose() {
+    // If this button's menu is open, close it when the card is recycled.
+    if (_NoteInfoMenu.isShowingFor(widget.note.id)) _NoteInfoMenu.dismiss();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = Theme.of(context).textTheme.labelSmall?.color;
+    final visible = widget.hovered || widget.focused;
+
+    // ⚠️  CompositedTransformTarget MUST be the outermost widget so it is
+    // always included in the paint tree.  Flutter's RenderOpacity skips
+    // painting entirely when opacity == 0 (performance optimisation), which
+    // would prevent the LeaderLayer from being pushed to the compositing tree,
+    // breaking the LayerLink and making the overlay follower disappear.
+    // By keeping CompositedTransformTarget *outside* AnimatedOpacity the
+    // LeaderLayer is always active regardless of button visibility.
+    return CompositedTransformTarget(
+      link: _link,
+      child: AnimatedOpacity(
+        opacity: visible ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 150),
+        child: IgnorePointer(
+          ignoring: !visible,
+          child: TapRegion(
+            groupId: _link,
+            child: Tooltip(
+              message: 'Note info',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(6),
+                onTap: () => _NoteInfoMenu.show(
+                  context: context,
+                  noteId: widget.note.id,
+                  link: _link,
+                  note: widget.note,
+                  isDraftView: widget.isDraftView,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(5),
+                  child: Icon(
+                    Icons.more_horiz_rounded,
+                    size: 15,
+                    color: iconColor,
+                  ),
+                ),
+              ),
+            ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Overlay widget (positioned independently in root Overlay) ─────────────────
+
+class _NoteInfoOverlay extends StatelessWidget {
+  const _NoteInfoOverlay({
+    required this.link,
+    required this.note,
+    required this.isDraftView,
+    required this.onDismiss,
+  });
+
+  final LayerLink link;
+  final Note note;
+  final bool isDraftView;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    // CompositedTransformFollower must be the overlay root for positioning.
+    // Align(widthFactor/heightFactor: 1) shrinks the subtree to content size
+    // so TapRegion's hit area matches only the visible popover box.
+    return CompositedTransformFollower(
+      link: link,
+      showWhenUnlinked: false,
+      targetAnchor: Alignment.bottomRight,
+      followerAnchor: Alignment.topRight,
+      offset: const Offset(0, 6),
+      child: Align(
+        alignment: Alignment.topRight,
+        widthFactor: 1,
+        heightFactor: 1,
+        child: TapRegion(
+          groupId: link,
+          onTapOutside: (_) => onDismiss(),
+          child: Material(
+            type: MaterialType.transparency,
+            child: _InfoPopover(
+              note: note,
+              isDraftView: isDraftView,
+              onClose: onDismiss,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Info popover content ──────────────────────────────────────────────────────
+
+class _InfoPopover extends StatelessWidget {
+  const _InfoPopover({
+    required this.note,
+    required this.isDraftView,
+    required this.onClose,
+  });
+
+  final Note note;
+  final bool isDraftView;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final nc = Theme.of(context).extension<NoteColors>();
+    final bgColor = Theme.of(context).cardTheme.color ?? Colors.white;
+    final borderColor = nc?.cardBorder ?? Colors.grey.shade200;
+
+    return Container(
+      width: 216,
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.45)
+                : Colors.black.withValues(alpha: 0.12),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Timestamps ──────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Column(
+              children: [
+                _TimeRow(
+                  icon: Icons.access_time_rounded,
+                  label: 'Modified',
+                  time: note.updatedAt.toLocal(),
+                ),
+                const SizedBox(height: 10),
+                _TimeRow(
+                  icon: Icons.calendar_today_rounded,
+                  label: 'Created',
+                  time: note.createdAt.toLocal(),
+                ),
+              ],
+            ),
+          ),
+          // ── Delete action (non-draft only) ───────────────────────────────
+          if (!isDraftView) ...[
+            Divider(height: 1, color: borderColor),
+            _DeleteRow(note: note, onClose: onClose),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TimeRow extends StatelessWidget {
+  const _TimeRow({
+    required this.icon,
+    required this.label,
+    required this.time,
+  });
+
+  final IconData icon;
+  final String label;
+  final DateTime time;
+
+  @override
+  Widget build(BuildContext context) {
+    final secondary = Theme.of(context).textTheme.labelSmall?.color;
+    final primary = Theme.of(context).textTheme.bodyMedium?.color;
+
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: secondary),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(fontSize: 10, color: secondary),
+            ),
+            const SizedBox(height: 1),
+            Text(
+              _format(time),
+              style: TextStyle(
+                fontSize: 12,
+                color: primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  String _formatTime(DateTime local) {
+  String _format(DateTime local) {
     final now = DateTime.now();
     final diff = now.difference(local);
     if (diff.inSeconds < 60) return 'just now';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
-    final m = const [
-      '',
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ][local.month];
-    return '$m ${local.day}, '
+    const months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[local.month]} ${local.day},  '
         '${local.hour.toString().padLeft(2, '0')}:'
         '${local.minute.toString().padLeft(2, '0')}';
   }
 }
 
-// ── Action Row ────────────────────────────────────────────────────────────────
-
-class _ActionRow extends StatelessWidget {
-  const _ActionRow({required this.note});
+class _DeleteRow extends StatefulWidget {
+  const _DeleteRow({required this.note, required this.onClose});
 
   final Note note;
+  final VoidCallback onClose;
 
   @override
-  Widget build(BuildContext context) {
-    final provider = context.read<NotesProvider>();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _CardAction(
-          icon: note.isPinned
-              ? Icons.push_pin_rounded
-              : Icons.push_pin_outlined,
-          tooltip: note.isPinned ? 'Unpin' : 'Pin to top',
-          onTap: () => provider.togglePin(note.id),
-          active: note.isPinned,
-        ),
-        _CardAction(
-          icon: note.isDraft
-              ? Icons.move_to_inbox_outlined
-              : Icons.drafts_outlined,
-          tooltip: note.isDraft ? 'Move to timeline' : 'Move to drafts',
-          onTap: () => provider.toggleDraft(note.id),
-        ),
-        _CardAction(
-          icon: Icons.delete_outline_rounded,
-          tooltip: 'Delete',
-          isDestructive: true,
-          onTap: () => _confirmDelete(context, provider),
-        ),
-      ],
-    );
-  }
-
-  void _confirmDelete(BuildContext context, NotesProvider provider) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete note?'),
-        content: const Text('This cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () {
-              provider.deleteNote(note.id);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
+  State<_DeleteRow> createState() => _DeleteRowState();
 }
 
-class _CardAction extends StatelessWidget {
-  const _CardAction({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-    this.active = false,
-    this.isDestructive = false,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  final bool active;
-  final bool isDestructive;
+class _DeleteRowState extends State<_DeleteRow> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    final color = isDestructive
-        ? Colors.red.shade400
-        : active
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).textTheme.labelSmall?.color;
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(5),
-          child: Icon(icon, size: 15, color: color),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: () {
+          widget.onClose();
+          context.read<NotesProvider>().deleteNote(widget.note.id);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          decoration: BoxDecoration(
+            color: _hovered
+                ? (isDark
+                    ? Colors.red.withValues(alpha: 0.12)
+                    : Colors.red.withValues(alpha: 0.06))
+                : Colors.transparent,
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(10),
+              bottomRight: Radius.circular(10),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded,
+                  size: 14, color: Colors.red.shade400),
+              const SizedBox(width: 10),
+              Text(
+                'Move to Trash',
+                style: TextStyle(fontSize: 13, color: Colors.red.shade400),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Height Helper ─────────────────────────────────────────────────────────────
+// ── Height helper ─────────────────────────────────────────────────────────────
 
-/// Estimates NoteCard height from content and column width.
-///
-/// Counts logical lines × word-wrap factor to approximate visual lines.
-/// Slightly over-estimates to avoid internal scrolling.
 abstract final class _NoteCardHeight {
   static const _fontSize = 14.0;
   static const _lineHeightMult = 1.65;
   static const _lineHeightPx = _fontSize * _lineHeightMult;
-  static const _headerHeight = 36.0;
+  // Header row height: a 25 px icon button + a little breathing room.
+  static const _headerHeight = 32.0;
+  // SizedBox(height: 8) between header row and editor.
+  static const _headerEditorGap = 8.0;
+  // top + bottom padding from AnimatedContainer.
   static const _vPad = LayoutConstants.cardPadding * 2;
   static const _hPad = LayoutConstants.cardPadding * 2;
   static const _minVisualLines = 3;
-  static const _charWidthRatio = 0.52;
 
   static double compute({
     required String content,
     required double columnWidth,
     double? minHeight,
   }) {
-    final availWidth = columnWidth - _hPad;
-    final charsPerLine = (availWidth / (_fontSize * _charWidthRatio))
-        .floor()
-        .clamp(20, 200);
+    final availWidth = (columnWidth - _hPad).clamp(20.0, double.infinity);
 
-    int visualLines = 0;
-    for (final line in content.split('\n')) {
-      visualLines += max(1, (line.length / charsPerLine).ceil());
-    }
-    visualLines = max(visualLines, _minVisualLines);
+    final painter = TextPainter(
+      text: TextSpan(
+        text: content.isEmpty ? ' ' : content,
+        style: const TextStyle(
+          fontSize: _fontSize,
+          height: _lineHeightMult,
+          fontFamily: 'Courier New',
+          fontFamilyFallback: ['Courier', 'monospace'],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: availWidth);
 
-    final computed = visualLines * _lineHeightPx + _headerHeight + _vPad;
+    final contentHeight = max(
+      painter.height + _lineHeightPx,
+      _minVisualLines * _lineHeightPx,
+    );
+    painter.dispose();
+
+    final computed =
+        contentHeight + _headerHeight + _headerEditorGap + _vPad;
     return minHeight != null ? max(minHeight, computed) : computed;
   }
 }

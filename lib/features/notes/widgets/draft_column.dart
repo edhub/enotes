@@ -3,208 +3,228 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
-import '../models/note.dart';
 import '../providers/notes_provider.dart';
-import 'column_header.dart';
 import 'note_card.dart';
 
-/// The left-most column. Displays up to [LayoutConstants.maxDraftNotes] draft
-/// notes as full-height cards, with dot indicators and arrows to switch.
+/// The left-most column. Five permanent draft tabs at the top, Chrome-style:
+/// the active tab has no bottom border and merges visually with the content
+/// area below it. Tab labels are fixed numbers 1–5.
 class DraftColumn extends StatelessWidget {
   const DraftColumn({super.key, required this.availableHeight});
 
   final double availableHeight;
 
-  double get _bodyHeight =>
-      availableHeight -
-      LayoutConstants.columnHeaderHeight -
-      LayoutConstants.pageVPad * 2;
+  static const _tabBarHeight = 44.0;
 
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: LayoutConstants.draftColumnWidth,
-      height: availableHeight,
-      child: Column(
-        children: [
-          const ColumnHeader(label: 'Drafts', isDraft: true),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: LayoutConstants.pageVPad,
-              ),
-              child: Consumer<NotesProvider>(
-                builder: (context, provider, _) {
-                  final drafts = provider.draftNotes;
-                  if (drafts.isEmpty) return _EmptyDraftState();
-                  return _DraftSwitcher(
-                    drafts: drafts,
-                    activeIndex: provider.activeDraftIndex,
-                    bodyHeight: _bodyHeight,
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Shows the active draft card with prev/next arrows and dot indicators.
-class _DraftSwitcher extends StatelessWidget {
-  const _DraftSwitcher({
-    required this.drafts,
-    required this.activeIndex,
-    required this.bodyHeight,
-  });
-
-  final List<Note> drafts;
-  final int activeIndex;
-  final double bodyHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: child,
-            ),
-            child: NoteCard(
-              key: ValueKey(drafts[activeIndex].id),
-              note: drafts[activeIndex],
-              isDraftView: true,
-              columnWidth: LayoutConstants.draftColumnWidth,
-              minHeight: bodyHeight - 56,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        _DraftNavBar(
-          count: drafts.length,
-          activeIndex: activeIndex,
-        ),
-      ],
-    );
-  }
-}
-
-/// Arrow buttons + dot indicators for switching between draft cards.
-class _DraftNavBar extends StatelessWidget {
-  const _DraftNavBar({required this.count, required this.activeIndex});
-
-  final int count;
-  final int activeIndex;
+  double get _cardHeight =>
+      availableHeight - _tabBarHeight - LayoutConstants.pageVPad * 2;
 
   @override
   Widget build(BuildContext context) {
     final nc = Theme.of(context).extension<NoteColors>();
-    final provider = context.read<NotesProvider>();
+    // Active tab background = content area background → seamless merge.
+    final draftBg =
+        nc?.draftCardBackground ?? Theme.of(context).cardTheme.color!;
+    final borderColor = nc?.cardBorder ?? const Color(0xFFE2E8F0);
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _ArrowButton(
-          icon: Icons.chevron_left_rounded,
-          enabled: activeIndex > 0,
-          onTap: () => provider.setActiveDraftIndex(activeIndex - 1),
-        ),
-        const SizedBox(width: 8),
-        ...List.generate(
-          count,
-          (i) => _Dot(
-            active: i == activeIndex,
-            activeColor: nc?.dotActive ?? Colors.indigo,
-            inactiveColor: nc?.dotInactive ?? Colors.grey,
-            onTap: () => provider.setActiveDraftIndex(i),
-          ),
-        ),
-        const SizedBox(width: 8),
-        _ArrowButton(
-          icon: Icons.chevron_right_rounded,
-          enabled: activeIndex < count - 1,
-          onTap: () => provider.setActiveDraftIndex(activeIndex + 1),
-        ),
-      ],
-    );
-  }
-}
+    return SizedBox(
+      width: LayoutConstants.draftColumnWidth,
+      height: availableHeight,
+      child: Consumer<NotesProvider>(
+        builder: (context, provider, _) {
+          final drafts = provider.draftNotes;
+          final safeIndex =
+              provider.activeDraftIndex.clamp(0, drafts.length - 1);
 
-class _ArrowButton extends StatelessWidget {
-  const _ArrowButton({
-    required this.icon,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      icon: Icon(icon),
-      onPressed: enabled ? onTap : null,
-      iconSize: 20,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-    );
-  }
-}
-
-class _Dot extends StatelessWidget {
-  const _Dot({
-    required this.active,
-    required this.activeColor,
-    required this.inactiveColor,
-    required this.onTap,
-  });
-
-  final bool active;
-  final Color activeColor;
-  final Color inactiveColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: active ? 20 : 8,
-        height: 8,
-        margin: const EdgeInsets.symmetric(horizontal: 3),
-        decoration: BoxDecoration(
-          color: active ? activeColor : inactiveColor,
-          borderRadius: BorderRadius.circular(4),
-        ),
+          return Column(
+            children: [
+              _ChromeTabBar(
+                count: drafts.length,
+                activeIndex: safeIndex,
+                activeBg: draftBg,
+                borderColor: borderColor,
+              ),
+              // Same background as active tab — no visible seam.
+              Expanded(
+                child: ColoredBox(
+                  color: draftBg,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: LayoutConstants.pageVPad,
+                    ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      transitionBuilder: (child, anim) =>
+                          FadeTransition(opacity: anim, child: child),
+                      child: NoteCard(
+                        key: ValueKey(drafts[safeIndex].id),
+                        note: drafts[safeIndex],
+                        isDraftView: true,
+                        columnWidth: LayoutConstants.draftColumnWidth,
+                        minHeight: _cardHeight,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-class _EmptyDraftState extends StatelessWidget {
+// ── Chrome-style tab bar ──────────────────────────────────────────────────────
+
+class _ChromeTabBar extends StatelessWidget {
+  const _ChromeTabBar({
+    required this.count,
+    required this.activeIndex,
+    required this.activeBg,
+    required this.borderColor,
+  });
+
+  final int count;
+  final int activeIndex;
+  final Color activeBg;
+  final Color borderColor;
+
   @override
   Widget build(BuildContext context) {
-    final secondary = Theme.of(context).textTheme.labelSmall?.color;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.edit_note_rounded, size: 40, color: secondary),
-          const SizedBox(height: 12),
-          Text(
-            'No drafts yet.\nTap + to capture a thought.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelSmall,
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Inactive tabs sit slightly above the scaffold colour.
+    final inactiveBg = isDark
+        ? Color.alphaBlend(Colors.white.withValues(alpha: 0.05), scaffoldBg)
+        : Color.alphaBlend(Colors.black.withValues(alpha: 0.04), scaffoldBg);
+
+    return Container(
+      height: DraftColumn._tabBarHeight,
+      // Tab bar is the same colour as the outer scaffold — tabs appear to
+      // "float" on top of it.
+      color: scaffoldBg,
+      padding: const EdgeInsets.only(
+        left: LayoutConstants.pageHPad,
+        right: LayoutConstants.pageHPad,
+        top: 8,
+        // No bottom padding: active tab's bottom edge touches content area.
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: List.generate(count, (i) {
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: i == 0 ? 0 : 4),
+              child: _ChromeTab(
+                label: '${i + 1}',
+                isActive: i == activeIndex,
+                activeBg: activeBg,
+                borderColor: borderColor,
+                inactiveBg: inactiveBg,
+                onTap: () =>
+                    context.read<NotesProvider>().setActiveDraftIndex(i),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+// ── Single Chrome tab ─────────────────────────────────────────────────────────
+
+class _ChromeTab extends StatefulWidget {
+  const _ChromeTab({
+    required this.label,
+    required this.isActive,
+    required this.activeBg,
+    required this.borderColor,
+    required this.inactiveBg,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isActive;
+  final Color activeBg;
+  final Color borderColor;
+  final Color inactiveBg;
+  final VoidCallback onTap;
+
+  @override
+  State<_ChromeTab> createState() => _ChromeTabState();
+}
+
+class _ChromeTabState extends State<_ChromeTab> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (widget.isActive) {
+      return Container(
+        decoration: BoxDecoration(
+          color: widget.activeBg,
+          // Rounded top corners only — bottom is open, merging with content.
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(8),
+            topRight: Radius.circular(8),
           ),
-        ],
+          border: Border(
+            top: BorderSide(color: widget.borderColor),
+            left: BorderSide(color: widget.borderColor),
+            right: BorderSide(color: widget.borderColor),
+            // No bottom border → seamless join with content area.
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          widget.label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: scheme.primary,
+          ),
+        ),
+      );
+    }
+
+    // ── Inactive tab ────────────────────────────────────────────────────────
+    final hoverBg = isDark
+        ? Color.alphaBlend(
+            Colors.white.withValues(alpha: 0.07), widget.inactiveBg)
+        : Color.alphaBlend(
+            Colors.black.withValues(alpha: 0.05), widget.inactiveBg);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          // Slight top + bottom margin makes inactive tabs visually shorter
+          // than the active tab, reinforcing the Chrome affordance.
+          margin: const EdgeInsets.only(top: 3, bottom: 2),
+          decoration: BoxDecoration(
+            color: _hovered ? hoverBg : widget.inactiveBg,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).textTheme.labelSmall?.color,
+            ),
+          ),
+        ),
       ),
     );
   }

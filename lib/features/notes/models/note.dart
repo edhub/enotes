@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 /// [createdAt] is fixed at creation and determines which time column the note
 /// belongs to. It is stored as UTC and displayed in local time.
 /// Only [content] and [updatedAt] change after creation.
+/// [deletedAt] is set on soft-delete; null means the note is active.
 class Note {
   const Note({
     required this.id,
@@ -12,8 +13,7 @@ class Note {
     required this.createdAt,
     required this.updatedAt,
     this.isDraft = false,
-    this.isPinned = false,
-    this.pinnedOrder,
+    this.deletedAt,
   });
 
   final String id;
@@ -26,11 +26,11 @@ class Note {
   final DateTime updatedAt;
 
   final bool isDraft;
-  final bool isPinned;
 
-  /// Milliseconds-since-epoch when pinned.
-  /// Higher value = pinned more recently = displayed first in column.
-  final int? pinnedOrder;
+  /// Set when the note is soft-deleted. Null means the note is active.
+  final DateTime? deletedAt;
+
+  bool get isDeleted => deletedAt != null;
 
   /// Creates a brand-new note with a generated UUID and current UTC time.
   factory Note.create({required String content, bool isDraft = false}) {
@@ -45,14 +45,13 @@ class Note {
   }
 
   /// Returns a copy with the given fields replaced.
-  /// Set [clearPinnedOrder] to true to reset pinnedOrder to null.
+  /// Set [clearDeletedAt] to true to un-delete (restore) a note.
   Note copyWith({
     String? content,
     DateTime? updatedAt,
     bool? isDraft,
-    bool? isPinned,
-    int? pinnedOrder,
-    bool clearPinnedOrder = false,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) =>
       Note(
         id: id,
@@ -60,9 +59,7 @@ class Note {
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
         isDraft: isDraft ?? this.isDraft,
-        isPinned: isPinned ?? this.isPinned,
-        pinnedOrder:
-            clearPinnedOrder ? null : (pinnedOrder ?? this.pinnedOrder),
+        deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
       );
 
   Map<String, dynamic> toJson() => {
@@ -71,8 +68,7 @@ class Note {
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
         'is_draft': isDraft,
-        'is_pinned': isPinned,
-        'pinned_order': pinnedOrder,
+        'deleted_at': deletedAt?.toIso8601String(),
       };
 
   factory Note.fromJson(Map<String, dynamic> json) => Note(
@@ -81,10 +77,13 @@ class Note {
         createdAt: DateTime.parse(json['created_at'] as String),
         updatedAt: DateTime.parse(json['updated_at'] as String),
         isDraft: json['is_draft'] as bool? ?? false,
-        isPinned: json['is_pinned'] as bool? ?? false,
-        pinnedOrder: json['pinned_order'] as int?,
+        deletedAt: json['deleted_at'] != null
+            ? DateTime.parse(json['deleted_at'] as String)
+            : null,
       );
 
   @override
-  String toString() => 'Note(id: $id, isDraft: $isDraft, content: ${content.substring(0, content.length.clamp(0, 20))})';
+  String toString() =>
+      'Note(id: $id, isDraft: $isDraft, deleted: $isDeleted, '
+      'content: ${content.substring(0, content.length.clamp(0, 20))})';
 }

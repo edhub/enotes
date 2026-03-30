@@ -9,8 +9,9 @@ import 'note_card.dart';
 
 /// A single time-group column (Today, Yesterday, This Week, etc.).
 ///
-/// Uses a [CustomScrollView] so the header sticks to the top while
-/// note cards scroll independently from all other columns.
+/// Uses a [CustomScrollView] so the header sticks to the top while note cards
+/// scroll independently from all other columns. Note cards themselves have no
+/// internal scroll — they are always fully expanded to fit their content.
 class TimeColumn extends StatefulWidget {
   const TimeColumn({
     super.key,
@@ -63,24 +64,15 @@ class _TimeColumnState extends State<TimeColumn> {
 
   Widget _buildNoteList(BuildContext context) {
     final provider = context.watch<NotesProvider>();
-    // Re-derive from provider so cards reflect live state
     final col = provider.timeColumns.firstWhere(
       (c) => c.bucketKey == widget.data.bucketKey,
       orElse: () => widget.data,
     );
 
-    final allNotes = [
-      ...col.pinnedNotes,
-      if (col.pinnedNotes.isNotEmpty && col.regularNotes.isNotEmpty)
-        null, // sentinel for divider
-      ...col.regularNotes,
-    ];
-
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, i) {
-          final item = allNotes[i];
-          if (item == null) return _PinnedDivider();
+          final note = col.notes[i];
           return Padding(
             padding: const EdgeInsets.only(
               left: LayoutConstants.pageHPad,
@@ -88,13 +80,14 @@ class _TimeColumnState extends State<TimeColumn> {
               bottom: LayoutConstants.cardMarginBottom,
             ),
             child: NoteCard(
-              note: item,
+              key: ValueKey(note.id),
+              note: note,
               isDraftView: false,
               columnWidth: LayoutConstants.timeColumnWidth,
             ),
           );
         },
-        childCount: allNotes.length,
+        childCount: col.notes.length,
       ),
     );
   }
@@ -123,28 +116,4 @@ class _ColumnHeaderDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) =>
       ColumnHeader(label: label, noteCount: count, isDraft: false);
-}
-
-class _PinnedDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: LayoutConstants.pageHPad,
-        vertical: 8,
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.push_pin_rounded, size: 12),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Divider(
-              height: 1,
-              color: Theme.of(context).dividerColor.withValues(alpha: 0.4),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
