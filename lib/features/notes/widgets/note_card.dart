@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../../editor/controllers/markdown_controller.dart';
+import '../../editor/services/markdown_shortcuts.dart';
 import '../../editor/widgets/markdown_editor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/note.dart';
@@ -43,12 +43,10 @@ class _NoteCardState extends State<NoteCard> {
   bool _focused = false;
   bool _hovered = false;
   bool _updatingController = false;
-  late String _contentForHeight;
 
   @override
   void initState() {
     super.initState();
-    _contentForHeight = widget.note.content;
     _controller = MarkdownController(text: widget.note.content);
     _focusNode = FocusNode(onKeyEvent: _handleKeyEvent)
       ..addListener(_onFocusChanged);
@@ -90,14 +88,61 @@ class _NoteCardState extends State<NoteCard> {
 
   // ── Key / focus / text listeners ───────────────────────────────────────────
 
-  /// ESC → unfocus the editor.
+  /// Handles keyboard shortcuts:
+  /// - ESC → unfocus the editor
+  /// - Cmd+B → toggle bold
+  /// - Cmd+L → toggle unordered list
+  /// - Shift+Cmd+L → toggle ordered list
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.escape) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    // ESC → unfocus
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
       node.unfocus();
       return KeyEventResult.handled;
     }
+
+    // Check for Cmd (macOS) / Ctrl (other platforms) modifier
+    final isCmd = HardwareKeyboard.instance.isLogicalKeyPressed(
+            LogicalKeyboardKey.metaLeft) ||
+        HardwareKeyboard.instance.isLogicalKeyPressed(LogicalKeyboardKey.metaRight);
+    final isShift = HardwareKeyboard.instance.isLogicalKeyPressed(
+            LogicalKeyboardKey.shiftLeft) ||
+        HardwareKeyboard.instance.isLogicalKeyPressed(LogicalKeyboardKey.shiftRight);
+
+    if (!isCmd) return KeyEventResult.ignored;
+
+    // Cmd+B → toggle bold
+    if (event.logicalKey == LogicalKeyboardKey.keyB) {
+      _applyShortcut(MarkdownShortcuts.toggleBold);
+      return KeyEventResult.handled;
+    }
+
+    // Cmd+L → toggle unordered list
+    if (event.logicalKey == LogicalKeyboardKey.keyL && !isShift) {
+      _applyShortcut(MarkdownShortcuts.toggleUnorderedList);
+      return KeyEventResult.handled;
+    }
+
+    // Shift+Cmd+L → toggle ordered list
+    if (event.logicalKey == LogicalKeyboardKey.keyL && isShift) {
+      _applyShortcut(MarkdownShortcuts.toggleOrderedList);
+      return KeyEventResult.handled;
+    }
+
     return KeyEventResult.ignored;
+  }
+
+  /// Applies a markdown shortcut transformation to the current text/selection.
+  void _applyShortcut(
+    (String, TextSelection) Function(String, TextSelection) shortcut,
+  ) {
+    final (newText, newSelection) = shortcut(_controller.text, _controller.selection);
+    _updatingController = true;
+    _controller.text = newText;
+    _controller.selection = newSelection;
+    _updatingController = false;
+    _flushSave();
   }
 
   void _onFocusChanged() {
@@ -107,10 +152,6 @@ class _NoteCardState extends State<NoteCard> {
 
   void _onTextChanged() {
     if (_updatingController) return;
-    final text = _controller.text;
-    if (text != _contentForHeight) {
-      setState(() => _contentForHeight = text);
-    }
     _saveTimer?.cancel();
     _saveTimer = Timer(const Duration(milliseconds: 600), _flushSave);
   }
@@ -126,6 +167,10 @@ class _NoteCardState extends State<NoteCard> {
 
   // ── Build ──────────────────────────────────────────────────────────────────
 
+  // Minimum visual height: 3 lines of text + top/bottom padding.
+  static const _minLineHeight = 14.0 * 1.6; // fontSize * lineHeight
+  static const _minContentHeight = 3 * _minLineHeight;
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -139,18 +184,15 @@ class _NoteCardState extends State<NoteCard> {
         ? (nc?.draftCardBackground ?? Theme.of(context).cardTheme.color)
         : Theme.of(context).cardTheme.color;
 
-    final height = _NoteCardHeight.compute(
-      content: _contentForHeight,
-      columnWidth: widget.columnWidth,
-      minHeight: widget.minHeight,
-    );
+    final minCardHeight = widget.minHeight ??
+        (_minContentHeight + LayoutConstants.cardPadding * 2);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        height: height,
+        constraints: BoxConstraints(minHeight: minCardHeight),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(LayoutConstants.cardBorderRadius),
@@ -167,16 +209,14 @@ class _NoteCardState extends State<NoteCard> {
                 ]
               : null,
         ),
-        // Top & side padding only — bottom is zero; the extra line in the
-        // height formula provides the one-line breathing room at the bottom.
-        padding: const EdgeInsets.only(
-          left: LayoutConstants.cardPadding,
-          right: LayoutConstants.cardPadding,
-          top: LayoutConstants.cardPadding,
-        ),
+        padding: const EdgeInsets.all(LayoutConstants.cardPadding),
         child: Stack(
           children: [
-            Positioned.fill(child: _buildEditor()),
+            MarkdownEditor(
+              controller: _controller,
+              focusNode: _focusNode,
+              hint: 'Start writing…',
+            ),
             // ⋯ button floats at top-right; zero layout impact.
             Positioned(
               top: 0,
@@ -194,13 +234,6 @@ class _NoteCardState extends State<NoteCard> {
     );
   }
 
-  Widget _buildEditor() {
-    return MarkdownEditor(
-      controller: _controller,
-      focusNode: _focusNode,
-      hint: 'Start writing…',
-    );
-  }
 }
 
 // ── Global note-info menu (singleton OverlayEntry) ───────────────────────────
@@ -559,44 +592,4 @@ class _DeleteRowState extends State<_DeleteRow> {
   }
 }
 
-// ── Height helper ─────────────────────────────────────────────────────────────
 
-abstract final class _NoteCardHeight {
-  static const _fontSize = 14.0;
-  static const _lineHeightMult = 1.6;
-  static const _lineHeightPx = _fontSize * _lineHeightMult;
-  // Top-only padding from AnimatedContainer (bottom = 0).
-  static const _topPad = LayoutConstants.cardPadding;
-  static const _hPad = LayoutConstants.cardPadding * 2;
-  static const _minVisualLines = 3;
-
-  static double compute({
-    required String content,
-    required double columnWidth,
-    double? minHeight,
-  }) {
-    final availWidth = (columnWidth - _hPad).clamp(20.0, double.infinity);
-
-    final painter = TextPainter(
-      text: TextSpan(
-        text: content.isEmpty ? ' ' : content,
-        style: const TextStyle(
-          fontSize: _fontSize,
-          height: _lineHeightMult,
-          // No fontFamily: estimating with the same system font the editor uses.
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: availWidth);
-
-    final contentHeight = max(
-      painter.height + _lineHeightPx,
-      _minVisualLines * _lineHeightPx,
-    );
-    painter.dispose();
-
-    // + _lineHeightPx (already in contentHeight) is the one-line bottom gap.
-    final computed = contentHeight + _topPad;
-    return minHeight != null ? max(minHeight, computed) : computed;
-  }
-}

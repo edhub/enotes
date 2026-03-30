@@ -1,0 +1,477 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:enotes/features/editor/services/markdown_shortcuts.dart';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Creates a collapsed selection at [offset].
+TextSelection _sel(int offset) => TextSelection.collapsed(offset: offset);
+
+/// Creates a selection from [start] to [end].
+TextSelection _range(int start, int end) =>
+    TextSelection(baseOffset: start, extentOffset: end);
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+void main() {
+  // ── toggleBold ──────────────────────────────────────────────────────────
+
+  group('toggleBold', () {
+    group('collapsed selection (cursor)', () {
+      test('inserts ** at cursor position', () {
+        final (text, sel) = MarkdownShortcuts.toggleBold('hello world', _sel(6));
+        expect(text, 'hello **world');
+        expect(sel.isCollapsed, isTrue);
+        expect(sel.extentOffset, 7); // cursor between the two *
+      });
+
+      test('at beginning of text', () {
+        final (text, sel) = MarkdownShortcuts.toggleBold('text', _sel(0));
+        expect(text, '**text');
+        expect(sel.extentOffset, 1);
+      });
+
+      test('at end of text', () {
+        final (text, sel) = MarkdownShortcuts.toggleBold('text', _sel(4));
+        expect(text, 'text**');
+        expect(sel.extentOffset, 5);
+      });
+
+      test('in empty text', () {
+        final (text, sel) = MarkdownShortcuts.toggleBold('', _sel(0));
+        expect(text, '**');
+        expect(sel.extentOffset, 1);
+      });
+
+      test('cursor inside bold region removes bold', () {
+        // *world*: opening * at 6, content at 7-11, closing * at 12
+        final (text, sel) = MarkdownShortcuts.toggleBold('hello *world*', _sel(9));
+        expect(text, 'hello world');
+        expect(sel.isCollapsed, isTrue);
+        expect(sel.extentOffset, 8);
+      });
+
+      test('cursor at start of bold content removes bold', () {
+        final (text, sel) = MarkdownShortcuts.toggleBold('hello *world*', _sel(7));
+        expect(text, 'hello world');
+        expect(sel.extentOffset, 6);
+      });
+
+      test('cursor at end of bold content removes bold', () {
+        // selEnd(12) <= innerEnd(12) → still inside
+        final (text, sel) = MarkdownShortcuts.toggleBold('hello *world*', _sel(12));
+        expect(text, 'hello world');
+        expect(sel.extentOffset, 11);
+      });
+
+      test('cursor outside bold region inserts **', () {
+        final (text, sel) = MarkdownShortcuts.toggleBold('hello *world*', _sel(3));
+        expect(text, 'hel**lo *world*');
+        expect(sel.extentOffset, 4);
+      });
+    });
+
+    group('with selection', () {
+      test('wraps selected text with *', () {
+        final (text, sel) = MarkdownShortcuts.toggleBold('hello world', _range(6, 11));
+        expect(text, 'hello *world*');
+        expect(sel.start, 7);
+        expect(sel.end, 12);
+      });
+
+      test('wraps Chinese text', () {
+        final (text, sel) = MarkdownShortcuts.toggleBold('这是重要内容', _range(2, 6));
+        expect(text, '这是*重要内容*');
+        expect(sel.start, 3);
+        expect(sel.end, 7);
+      });
+
+      test('wraps text with spaces', () {
+        final (text, _) = MarkdownShortcuts.toggleBold('hello beautiful world', _range(6, 15));
+        expect(text, 'hello *beautiful* world');
+      });
+
+      test('selection inside bold region removes bold', () {
+        final (text, sel) = MarkdownShortcuts.toggleBold('hello *world*', _range(7, 12));
+        expect(text, 'hello world');
+        expect(sel.start, 6);
+        expect(sel.end, 11);
+      });
+
+      test('selection inside bold region (Chinese) removes bold', () {
+        // '这是*粗体*文字': * at 2, content at 3-4, * at 5
+        final (text, sel) = MarkdownShortcuts.toggleBold('这是*粗体*文字', _range(3, 5));
+        expect(text, '这是粗体文字');
+        expect(sel.start, 2);
+        expect(sel.end, 4);
+      });
+
+      test('partial selection (not completely inside) wraps with *', () {
+        // selEnd(13) > innerEnd(12) → not inside → wraps
+        final (text, _) = MarkdownShortcuts.toggleBold('hello *world*', _range(7, 13));
+        expect(text, 'hello **world**');
+      });
+    });
+
+    group('multiple toggles', () {
+      test('toggle twice returns to original text', () {
+        const original = 'hello world';
+        final first = MarkdownShortcuts.toggleBold(original, _range(6, 11));
+        expect(first.$1, 'hello *world*');
+        // Selection covers inner content (7, 12) — completely inside the bold span.
+        expect(first.$2.start, 7);
+        expect(first.$2.end, 12);
+        // Second toggle: (7, 12) is inside *world* → remove bold.
+        final second = MarkdownShortcuts.toggleBold(first.$1, first.$2);
+        expect(second.$1, original);
+      });
+
+      test('toggle twice with Chinese returns to original text', () {
+        const original = '这是重要内容';
+        final first = MarkdownShortcuts.toggleBold(original, _range(2, 6));
+        expect(first.$1, '这是*重要内容*');
+        final second = MarkdownShortcuts.toggleBold(first.$1, first.$2);
+        expect(second.$1, original);
+      });
+    });
+  });
+
+  // ── toggleUnorderedList ─────────────────────────────────────────────────────
+
+  group('toggleUnorderedList', () {
+    group('single line', () {
+      test('adds - prefix to plain line', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          'hello world',
+          _sel(6),
+        );
+        expect(text, '- hello world');
+        expect(sel.start, 0);
+        expect(sel.end, text.length);
+      });
+
+      test('adds - prefix to Chinese line', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '列表项',
+          _sel(2),
+        );
+        expect(text, '- 列表项');
+      });
+
+      test('removes - prefix from unordered list', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '- hello world',
+          _sel(6),
+        );
+        expect(text, 'hello world');
+      });
+
+      test('removes * prefix from unordered list', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '* hello world',
+          _sel(6),
+        );
+        expect(text, 'hello world');
+      });
+
+      test('removes + prefix from unordered list', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '+ hello world',
+          _sel(6),
+        );
+        expect(text, 'hello world');
+      });
+
+      test('removes - prefix from Chinese', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '- 列表项',
+          _sel(3),
+        );
+        expect(text, '列表项');
+      });
+
+      test('removes ordered prefix and adds - (mutually exclusive)', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '1. hello world',
+          _sel(6),
+        );
+        expect(text, '- hello world');
+      });
+
+      test('removes ordered prefix 2. and adds -', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '2. second item',
+          _sel(6),
+        );
+        expect(text, '- second item');
+      });
+
+      test('preserves indentation', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '  indented text',
+          _sel(6),
+        );
+        expect(text, '  - indented text');
+      });
+
+      test('removes prefix from indented list', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '  - indented item',
+          _sel(6),
+        );
+        expect(text, '  indented item');
+      });
+
+      test('empty line remains unchanged', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '',
+          _sel(0),
+        );
+        expect(text, '');
+      });
+
+      test('whitespace-only line remains unchanged', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '   ',
+          _sel(1),
+        );
+        expect(text, '   ');
+      });
+    });
+
+    group('multiple lines', () {
+      test('adds - to multiple lines', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          'first\nsecond\nthird',
+          _range(2, 15),
+        );
+        expect(text, '- first\n- second\n- third');
+      });
+
+      test('adds - to multiple Chinese lines', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '第一项\n第二项\n第三项',
+          _range(2, 8),
+        );
+        expect(text, '- 第一项\n- 第二项\n- 第三项');
+      });
+
+      test('removes - from all selected lines', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '- first\n- second\n- third',
+          _range(2, 20),
+        );
+        expect(text, 'first\nsecond\nthird');
+      });
+
+      test('mixed: some have prefix, some do not → add to all', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '- first\nsecond\n- third',
+          _range(2, 18),
+        );
+        expect(text, '- first\n- second\n- third');
+      });
+
+      test('converts ordered to unordered (mutually exclusive)', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '1. first\n2. second\n3. third',
+          _range(2, 22),
+        );
+        expect(text, '- first\n- second\n- third');
+      });
+
+      test('preserves indentation in multiline', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          '  first\n  second',
+          _range(2, 12),
+        );
+        expect(text, '  - first\n  - second');
+      });
+
+      test('empty line in middle is skipped', () {
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
+          'first\n\nthird',
+          _range(2, 9),
+        );
+        expect(text, '- first\n\n- third');
+      });
+    });
+  });
+
+  // ── toggleOrderedList ───────────────────────────────────────────────────────
+
+  group('toggleOrderedList', () {
+    group('single line', () {
+      test('adds 1. prefix to plain line', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          'hello world',
+          _sel(6),
+        );
+        expect(text, '1. hello world');
+      });
+
+      test('adds 1. prefix to Chinese line', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '列表项',
+          _sel(2),
+        );
+        expect(text, '1. 列表项');
+      });
+
+      test('removes 1. prefix from ordered list', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '1. hello world',
+          _sel(6),
+        );
+        expect(text, 'hello world');
+      });
+
+      test('removes 2. prefix from ordered list', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '2. hello world',
+          _sel(6),
+        );
+        expect(text, 'hello world');
+      });
+
+      test('removes - prefix and adds 1. (mutually exclusive)', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '- hello world',
+          _sel(6),
+        );
+        expect(text, '1. hello world');
+      });
+
+      test('removes * prefix and adds 1.', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '* hello world',
+          _sel(6),
+        );
+        expect(text, '1. hello world');
+      });
+
+      test('preserves indentation', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '  indented text',
+          _sel(6),
+        );
+        expect(text, '  1. indented text');
+      });
+    });
+
+    group('multiple lines', () {
+      test('adds numbered prefixes (1., 2., 3.)', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          'first\nsecond\nthird',
+          _range(2, 15),
+        );
+        expect(text, '1. first\n2. second\n3. third');
+      });
+
+      test('adds numbered prefixes to Chinese lines', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '第一项\n第二项\n第三项',
+          _range(2, 8),
+        );
+        expect(text, '1. 第一项\n2. 第二项\n3. 第三项');
+      });
+
+      test('removes numbered prefixes from all lines', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '1. first\n2. second\n3. third',
+          _range(2, 22),
+        );
+        expect(text, 'first\nsecond\nthird');
+      });
+
+      test('removes non-consecutive numbered prefixes', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '5. first\n10. second',
+          _range(2, 15),
+        );
+        expect(text, 'first\nsecond');
+      });
+
+      test('converts unordered to ordered (mutually exclusive)', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '- first\n- second\n- third',
+          _range(2, 20),
+        );
+        expect(text, '1. first\n2. second\n3. third');
+      });
+
+      test('mixed prefixes → all converted to ordered', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '- first\n1. second\n* third',
+          _range(2, 18),
+        );
+        expect(text, '1. first\n2. second\n3. third');
+      });
+
+      test('empty line in middle is skipped', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          'first\n\nthird',
+          _range(2, 9),
+        );
+        expect(text, '1. first\n\n2. third');
+      });
+
+      test('preserves indentation in multiline', () {
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
+          '  first\n  second',
+          _range(2, 12),
+        );
+        expect(text, '  1. first\n  2. second');
+      });
+    });
+  });
+
+  // ── mutual exclusivity ─────────────────────────────────────────────────────
+
+  group('mutual exclusivity (unordered vs ordered)', () {
+    test('toggleUnordered on ordered → becomes unordered', () {
+      final (text, _) = MarkdownShortcuts.toggleUnorderedList(
+        '1. item',
+        _sel(3),
+      );
+      expect(text, '- item');
+    });
+
+    test('toggleOrdered on unordered → becomes ordered', () {
+      final (text, _) = MarkdownShortcuts.toggleOrderedList(
+        '- item',
+        _sel(3),
+      );
+      expect(text, '1. item');
+    });
+
+    test('unordered → ordered → unordered cycle', () {
+      const start = 'plain text';
+      final unordered = MarkdownShortcuts.toggleUnorderedList(start, _sel(3));
+      expect(unordered.$1, '- plain text');
+
+      final ordered = MarkdownShortcuts.toggleOrderedList(unordered.$1, unordered.$2);
+      expect(ordered.$1, '1. plain text');
+
+      final backToUnordered = MarkdownShortcuts.toggleUnorderedList(ordered.$1, ordered.$2);
+      expect(backToUnordered.$1, '- plain text');
+    });
+
+    test('converting multi-line ordered to unordered', () {
+      final (text, _) = MarkdownShortcuts.toggleUnorderedList(
+        '1. first\n2. second\n3. third',
+        _range(0, 26),
+      );
+      expect(text, '- first\n- second\n- third');
+    });
+
+    test('converting multi-line unordered to ordered with correct numbering', () {
+      final (text, _) = MarkdownShortcuts.toggleOrderedList(
+        '- first\n- second\n- third',
+        _range(0, 20),
+      );
+      expect(text, '1. first\n2. second\n3. third');
+    });
+  });
+}

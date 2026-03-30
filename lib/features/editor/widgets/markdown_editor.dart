@@ -36,11 +36,10 @@ class MarkdownEditor extends StatelessWidget {
     return TextField(
       controller: controller,
       focusNode: focusNode,
-      // null + expands fills the parent's tight height constraint (provided
-      // by Positioned.fill inside NoteCard's Stack) without internal scroll.
+      // Let TextField expand naturally based on content.
+      // minLines ensures a minimum visual height, maxLines allows unlimited growth.
+      minLines: 3,
       maxLines: null,
-      expands: true,
-      textAlignVertical: TextAlignVertical.top,
       style: TextStyle(fontSize: 14, height: 1.6, color: textColor),
       cursorColor: cursorColor,
       cursorWidth: 1.5,
