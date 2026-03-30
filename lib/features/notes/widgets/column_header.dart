@@ -8,12 +8,10 @@ class ColumnHeader extends StatelessWidget {
   const ColumnHeader({
     super.key,
     required this.label,
-    required this.isDraft,
     this.noteCount,
   });
 
   final String label;
-  final bool isDraft;
   final int? noteCount;
 
   @override
@@ -29,15 +27,6 @@ class ColumnHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (isDraft)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Icon(
-                Icons.edit_note_rounded,
-                size: 18,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
           Text(label, style: tt.titleMedium),
           if (noteCount != null && noteCount! > 0) ...[
             const SizedBox(width: 8),

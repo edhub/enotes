@@ -79,6 +79,7 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
   }
 
   Widget _buildScrollArea(BuildContext context) {
+    final availH = MediaQuery.of(context).size.height;
     return Listener(
       onPointerSignal: (event) {
         if (event is! PointerScrollEvent) return;
@@ -92,14 +93,9 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
         child: SingleChildScrollView(
           controller: _hScroll,
           scrollDirection: Axis.horizontal,
-          child: LayoutBuilder(
-            builder: (context, _) {
-              final availH = MediaQuery.of(context).size.height;
-              return SizedBox(
-                height: availH,
-                child: _buildRow(context, availH),
-              );
-            },
+          child: SizedBox(
+            height: availH,
+            child: _buildRow(context, availH),
           ),
         ),
       ),

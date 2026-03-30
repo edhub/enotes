@@ -176,7 +176,7 @@ class NotesProvider extends ChangeNotifier {
       _notes.add(Note.create(content: '', isDraft: true));
     }
     // Persist the newly created slots without waiting for debounce.
-    _service.saveNotes(List<Note>.unmodifiable(_notes));
+    unawaited(_service.saveNotes(List<Note>.unmodifiable(_notes)));
   }
 
   /// Notifies listeners and schedules a debounced (800 ms) save.

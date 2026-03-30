@@ -115,5 +115,5 @@ class _ColumnHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) =>
-      ColumnHeader(label: label, noteCount: count, isDraft: false);
+      ColumnHeader(label: label, noteCount: count);
 }

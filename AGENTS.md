@@ -8,7 +8,7 @@
 
 **eNotes** 是一款专为 16 寸大屏笔记本优化的 Flutter 桌面笔记应用，核心功能是 **Timeline Kanban（时间轴画板）** 布局：将笔记按时间分组横向排列成多列，充分利用宽屏空间。
 
-- **平台目标**：macOS Desktop（主），兼容 Web / iOS / Android
+- **平台目标**：macOS Desktop
 - **Flutter 版本**：3.41.6（Dart SDK ^3.11.4）
 - **状态管理**：`provider` (ChangeNotifier)
 - **持久化**：`path_provider` + JSON 文件（无代码生成）
@@ -34,13 +34,12 @@ lib/
 │       ├── providers/
 │       │   └── notes_provider.dart  # ChangeNotifier：全量业务逻辑
 │       └── widgets/
-│           ├── timeline_kanban_view.dart   # 根布局：横向滚动 + 列编排
-│           ├── draft_column.dart           # 草稿列（600px）
-│           ├── time_column.dart            # 时间分组列（500px）
-│           ├── note_card.dart              # 单条笔记卡片
-│           ├── column_header.dart          # 吸顶列标题
-│           ├── note_editor_dialog.dart     # 新建 / 编辑对话框
-│           └── add_note_fab.dart           # 悬浮新建按钮
+│           ├── timeline_kanban_view.dart   # 根布局：横向滚动 + 列编排（含 _AddNoteFab）
+│           ├── draft_column.dart           # 草稿列（600px），Chrome 风格 tab 栏
+│           ├── time_column.dart            # 时间分组列（450px）
+│           ├── trash_column.dart           # 回收站列（400px，最右侧）
+│           ├── note_card.dart              # 单条笔记卡片（inline re_editor）
+│           └── column_header.dart          # 吸顶列标题
 │
 └── core/
     ├── constants/
@@ -62,8 +61,7 @@ lib/
 | `createdAt` | `DateTime` | **不可变**，决定所属时间列 |
 | `updatedAt` | `DateTime` | 每次编辑更新，但不影响位置 |
 | `isDraft` | `bool` | true → 显示在草稿列 |
-| `isPinned` | `bool` | true → 在所属列内置顶 |
-| `pinnedOrder` | `int?` | 置顶时的排序权重 |
+| `deletedAt` | `DateTime?` | 软删除时间戳；null 表示活跃 |
 
 > **关键约束**：`createdAt` 一经创建永不修改；编辑笔记只更新 `content` 和 `updatedAt`。
 
@@ -88,25 +86,34 @@ today > yesterday > thisWeek > lastWeek > isoWeek(2026W06...)
 ```dart
 class NotesProvider extends ChangeNotifier {
   // 对外暴露
-  List<Note> get draftNotes          // 草稿，按 createdAt 倒序
-  List<TimeColumnData> get timeColumns  // 分组后的时间列数据
+  List<Note> get draftNotes           // 草稿（createdAt 升序，固定 5 个 tab）
+  int get activeDraftIndex            // 当前激活的草稿 tab 索引
+  List<TimeColumnData> get timeColumns   // 分组后的时间列数据
+  List<Note> get trashedNotes         // 软删除笔记（deletedAt 倒序）
+  String? get pendingFocusNoteId      // 待聚焦笔记 ID（新建后使用）
 
   // 操作
-  Future<void> addNote(String content, {bool isDraft})  // 新建 → today 顶部
-  Future<void> updateNote(String id, String content)    // 更新内容，不改位置
-  Future<void> togglePin(String id)                     // 置顶/取消置顶
-  Future<void> toggleDraft(String id)                   // 移入/移出草稿
-  Future<void> deleteNote(String id)
+  void addNote(String content)                  // 新建笔记 → today 顶部
+  void updateNote(String id, String content)    // 更新内容，不改位置
+  void deleteNote(String id)                    // 软删除（草稿不可删）
+  void restoreNote(String id)                   // 从回收站恢复
+  void permanentlyDeleteNote(String id)         // 永久删除（仅回收站）
+  void emptyTrash()                             // 清空回收站
+  void setActiveDraftIndex(int index)           // 切换草稿 tab
+  void flushSave()                              // 立即写入（生命周期调用）
+  void clearPendingFocus()                      // 清除待聚焦状态
 }
 ```
 
 `TimeColumnData` 结构：
 ```dart
 class TimeColumnData {
+  final String bucketKey;   // 'today' | 'yesterday' | 'this_week' | 'last_week' | 'week_YYYY_M_D'
   final TimeGroup group;
-  final String label;              // "Today", "Yesterday", "2026W06"...
-  final List<Note> pinnedNotes;    // 置顶笔记（按 pinnedOrder 排序）
-  final List<Note> regularNotes;   // 常规笔记（按插入顺序稳定排列）
+  final String label;       // "Today", "Yesterday", "2026 W11"…
+  final List<Note> notes;   // 该列所有活跃笔记（插入顺序，稳定，不重新排序）
+  final int sortOrder;      // 越小越靠左（today=0）
+  int get totalCount;       // notes.length
 }
 ```
 
@@ -166,10 +173,12 @@ CustomScrollView
 dependencies:
   flutter:
     sdk: flutter
-  provider: ^6.1.2
+  provider: ^6.1.5+1
   path_provider: ^2.1.5
   intl: ^0.20.2
-  uuid: ^4.5.1
+  uuid: ^4.5.3
+  re_editor: ^0.8.0
+  re_highlight: ^0.0.3
 ```
 
 无代码生成依赖，无复杂构建步骤。
@@ -196,16 +205,14 @@ dependencies:
 
 - 点击 FAB → 在 Today 列顶部插入一条空笔记 → 自动滚动到该笔记 → 自动聚焦 `CodeEditor`
 - 草稿同理：插入草稿列第一槽，自动聚焦
-- **`NoteEditorDialog` 已废弃，仅作历史代码保留，不再使用**
 
 ### 依赖
 
 ```yaml
 dependencies:
-  re_editor: ^0.8.0   # Inline CodeEditor，Markdown 高亮，Cmd+S 快捷键
+  re_editor: ^0.8.0      # Inline CodeEditor，Markdown 高亮，Cmd+S 快捷键
+  re_highlight: ^0.0.3   # 语言定义与主题，note_card.dart 直接导入，需显式声明
 ```
-
-（`re_highlight` 是 `re_editor` 的传递依赖，无需单独声明。）
 
 ---
 

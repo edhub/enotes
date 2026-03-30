@@ -169,18 +169,27 @@ class _NoteCardState extends State<NoteCard> {
                 ]
               : null,
         ),
-        padding: const EdgeInsets.all(LayoutConstants.cardPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        // Top & side padding only — bottom is zero; the extra line in the
+        // height formula provides the one-line breathing room at the bottom.
+        padding: const EdgeInsets.only(
+          left: LayoutConstants.cardPadding,
+          right: LayoutConstants.cardPadding,
+          top: LayoutConstants.cardPadding,
+        ),
+        child: Stack(
           children: [
-            _CardHeader(
-              note: widget.note,
-              hovered: _hovered,
-              focused: _focused,
-              isDraftView: widget.isDraftView,
+            Positioned.fill(child: _buildEditor(isDark)),
+            // ⋯ button floats at top-right; zero layout impact.
+            Positioned(
+              top: 0,
+              right: 0,
+              child: _InfoButton(
+                note: widget.note,
+                isDraftView: widget.isDraftView,
+                hovered: _hovered,
+                focused: _focused,
+              ),
             ),
-            const SizedBox(height: 8),
-            Expanded(child: _buildEditor(isDark)),
           ],
         ),
       ),
@@ -212,41 +221,6 @@ class _NoteCardState extends State<NoteCard> {
       verticalScrollbarWidth: 0,
       horizontalScrollbarHeight: 0,
       indicatorBuilder: null,
-    );
-  }
-}
-
-// ── Card header ───────────────────────────────────────────────────────────────
-
-/// Header row: empty left side + ⋯ info button (visible on hover or focus).
-/// No timestamp is shown here — timestamps are inside the info popover.
-class _CardHeader extends StatelessWidget {
-  const _CardHeader({
-    required this.note,
-    required this.hovered,
-    required this.focused,
-    required this.isDraftView,
-  });
-
-  final Note note;
-  final bool hovered;
-  final bool focused;
-  final bool isDraftView;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Spacer(),
-        // Pass hovered/focused INTO _InfoButton so it can place AnimatedOpacity
-        // INSIDE CompositedTransformTarget — never outside it.
-        _InfoButton(
-          note: note,
-          isDraftView: isDraftView,
-          hovered: hovered,
-          focused: focused,
-        ),
-      ],
     );
   }
 }
@@ -611,14 +585,10 @@ class _DeleteRowState extends State<_DeleteRow> {
 
 abstract final class _NoteCardHeight {
   static const _fontSize = 14.0;
-  static const _lineHeightMult = 1.65;
+  static const _lineHeightMult = 1.6;
   static const _lineHeightPx = _fontSize * _lineHeightMult;
-  // Header row height: a 25 px icon button + a little breathing room.
-  static const _headerHeight = 32.0;
-  // SizedBox(height: 8) between header row and editor.
-  static const _headerEditorGap = 8.0;
-  // top + bottom padding from AnimatedContainer.
-  static const _vPad = LayoutConstants.cardPadding * 2;
+  // Top-only padding from AnimatedContainer (bottom = 0).
+  static const _topPad = LayoutConstants.cardPadding;
   static const _hPad = LayoutConstants.cardPadding * 2;
   static const _minVisualLines = 3;
 
@@ -635,8 +605,7 @@ abstract final class _NoteCardHeight {
         style: const TextStyle(
           fontSize: _fontSize,
           height: _lineHeightMult,
-          fontFamily: 'Courier New',
-          fontFamilyFallback: ['Courier', 'monospace'],
+          fontFamily: 'monospace',
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -648,8 +617,8 @@ abstract final class _NoteCardHeight {
     );
     painter.dispose();
 
-    final computed =
-        contentHeight + _headerHeight + _headerEditorGap + _vPad;
+    // + _lineHeightPx (already in contentHeight) is the one-line bottom gap.
+    final computed = contentHeight + _topPad;
     return minHeight != null ? max(minHeight, computed) : computed;
   }
 }

@@ -8,7 +8,7 @@ default:
 
 # 构建 release 包
 build:
-    flutter clean && flutter build macos --release
+    flutter build macos --release
 
 # 停止正在运行的程序
 stop:
@@ -16,7 +16,7 @@ stop:
 
 # 安装到 /Applications（需先 build）
 install: stop
-    cp -r "{{ release }}" "{{ install }}"
+    rsync -av --delete "{{ release }}" "{{ install }}"
     @echo "已安装到 {{ install }}"
 
 # 启动
