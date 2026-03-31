@@ -317,26 +317,28 @@ void main() {
   // ── block — heading ────────────────────────────────────────────────────────
 
   group('block — heading', () {
-    test('H1 font size 26 — en', () => expect(_sz(_flat(_build('# Hello')), 26.0), isTrue));
-    test('H2 font size 22 — en', () => expect(_sz(_flat(_build('## Hello')), 22.0), isTrue));
-    test('H3 font size 19 — en', () => expect(_sz(_flat(_build('### Hello')), 19.0), isTrue));
-    test('H4 font size 17 — en', () => expect(_sz(_flat(_build('#### Hello')), 17.0), isTrue));
-    test('H5 font size 15 — en', () => expect(_sz(_flat(_build('##### Hello')), 15.0), isTrue));
+    // Font sizes per level (as defined in _headingSizes)
+    // H1-H3: 15.0, H4-H6: 14.0
+    test('H1 font size 15 — en', () => expect(_sz(_flat(_build('# Hello')), 15.0), isTrue));
+    test('H2 font size 15 — en', () => expect(_sz(_flat(_build('## Hello')), 15.0), isTrue));
+    test('H3 font size 15 — en', () => expect(_sz(_flat(_build('### Hello')), 15.0), isTrue));
+    test('H4 font size 14 — en', () => expect(_sz(_flat(_build('#### Hello')), 14.0), isTrue));
+    test('H5 font size 14 — en', () => expect(_sz(_flat(_build('##### Hello')), 14.0), isTrue));
     test('H6 font size 14 — en', () => expect(_sz(_flat(_build('###### Hello')), 14.0), isTrue));
 
     test('H1 is bold', () => expect(_bold(_flat(_build('# Hello'))), isTrue));
 
     test('H1 zh — 一级标题', () {
       final s = _flat(_build('# 一级标题'));
-      expect(_sz(s, 26.0), isTrue);
+      expect(_sz(s, 15.0), isTrue);
       expect(_bold(s), isTrue);
     });
 
-    test('H2 zh — 二级标题', () => expect(_sz(_flat(_build('## 二级标题')), 22.0), isTrue));
+    test('H2 zh — 二级标题', () => expect(_sz(_flat(_build('## 二级标题')), 15.0), isTrue));
 
     test('H3 zh — 三级标题 with number prefix', () {
       final s = _flat(_build('### 一、项目背景'));
-      expect(_sz(s, 19.0), isTrue);
+      expect(_sz(s, 15.0), isTrue);
       expect(_bold(s), isTrue);
     });
 
@@ -475,40 +477,26 @@ void main() {
     });
   });
 
-  // ── block — fenced code ────────────────────────────────────────────────────
+  // ── fenced code block removed — ``` treated as plain text ───────────────
 
-  group('block — fenced code', () {
-    const fence = '```\nfoo = bar\nbaz()\n```';
-
-    test('fence lines are monospace', () => expect(_mono(_flat(_build(fence))), isTrue));
-
-    test('code content is monospace', () {
-      expect(_spanOf(_flat(_build(fence)), 'foo = bar')?.style?.fontFamily, 'monospace');
+  group('block — fenced code removed', () {
+    test('``` is treated as plain text, not code block', () {
+      final s = _flat(_build('```\nfoo = bar\n```'));
+      // ``` should not be monospace styled
+      expect(_spanOf(s, '```')?.style?.fontFamily, isNot('monospace'));
+      // Content should not have code background
+      expect(_spanOf(s, 'foo = bar')?.style?.backgroundColor, isNull);
     });
 
-    test('code content has background colour', () {
-      expect(_spanOf(_flat(_build(fence)), 'foo = bar')?.style?.backgroundColor, isNotNull);
-    });
-
-    test('lang tag line (```dart) is styled', () {
-      expect(_spanOf(_flat(_build('```dart\nfinal x = 1;\n```')), '```dart')?.style?.fontFamily, 'monospace');
-    });
-
-    test('line after closing fence is NOT code', () {
-      final s = _flat(_build('```\ncode\n```\nnormal text'));
-      expect(_spanOf(s, 'normal text')?.style?.fontFamily, isNot('monospace'));
-      expect(_spanOf(s, 'normal text')?.style?.backgroundColor, isNull);
-    });
-
-    test('zh content inside code block', () {
-      expect(_spanOf(_flat(_build('```\n打印("你好")\n```')), '打印("你好")')?.style?.fontFamily, 'monospace');
-    });
-
-    test('markdown inside fence is NOT parsed', () {
+    test('markdown inside ``` is still parsed as bold', () {
       final s = _flat(_build('```\n**bold**\n```'));
-      final span = _spanOf(s, '**bold**');
-      expect(span, isNotNull);
-      expect(span?.style?.fontWeight, isNot(FontWeight.bold));
+      // **bold** should still be recognized as bold
+      expect(_spanOf(s, '**bold**')?.style?.fontWeight, FontWeight.bold);
+    });
+
+    test('lang tag (```dart) is plain text', () {
+      final s = _flat(_build('```dart\ncode\n```'));
+      expect(_spanOf(s, '```dart')?.style?.fontFamily, isNot('monospace'));
     });
   });
 

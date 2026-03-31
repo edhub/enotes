@@ -15,47 +15,131 @@ class MarkdownShortcuts {
   ///
   /// - Cursor/selection completely inside an existing `*...*`: removes the markers.
   /// - Collapsed cursor outside bold: inserts `**` with cursor positioned between them.
-  /// - Selection outside bold: wraps with `*...*`; selection shifts to inner content.
+  /// - Single-line selection: wraps with `*...*`.
+  /// - Multi-line selection: wraps each line's selected portion with `*...*`.
   static (String text, TextSelection selection) toggleBold(
     String text,
     TextSelection selection,
   ) {
-    // If cursor or selection is completely inside an existing *...* span, remove it.
-    final enclosing = _findEnclosingBold(text, selection.start, selection.end);
-    if (enclosing != null) {
-      final (openPos, closePos) = enclosing;
-      // Remove higher-index marker first to preserve the lower-index position.
-      final newText = text.substring(0, openPos) +
-          text.substring(openPos + 1, closePos) +
-          text.substring(closePos + 1);
-      // Shift selection left by 1 (the removed opening *).
-      final newStart = (selection.start - 1).clamp(0, newText.length);
-      final newEnd = (selection.end - 1).clamp(0, newText.length);
-      return (
-        newText,
-        selection.isCollapsed
-            ? TextSelection.collapsed(offset: newStart)
-            : TextSelection(baseOffset: newStart, extentOffset: newEnd),
-      );
-    }
-
+    // Handle collapsed cursor first
     if (selection.isCollapsed) {
-      // No selection: insert ** at cursor; cursor lands between the two *.
+      // Check if cursor is inside an existing *...* span or empty **
+      final enclosing = _findEnclosingBold(text, selection.start, selection.end);
+      if (enclosing != null) {
+        final (openPos, closePos) = enclosing;
+        final newText = text.substring(0, openPos) +
+            text.substring(openPos + 1, closePos) +
+            text.substring(closePos + 1);
+        final newOffset = (selection.start - 1).clamp(0, newText.length);
+        return (newText, TextSelection.collapsed(offset: newOffset));
+      }
+      // Insert ** at cursor; cursor lands between the two *
       final pos = selection.extentOffset;
       final newText = '${text.substring(0, pos)}**${text.substring(pos)}';
       return (newText, TextSelection.collapsed(offset: pos + 1));
     }
 
-    // Wrap selection with *...*.
-    final start = selection.start;
-    final end = selection.end;
-    final inner = text.substring(start, end);
-    final newText = '${text.substring(0, start)}*$inner*${text.substring(end)}';
-    // Selection covers the inner content (between the markers).
+    // Check if selection spans multiple lines
+    final selectedText = text.substring(selection.start, selection.end);
+    final hasMultipleLines = selectedText.contains('\n');
+
+    if (!hasMultipleLines) {
+      // Single-line selection: check if inside existing bold, then wrap/remove
+      final enclosing = _findEnclosingBold(text, selection.start, selection.end);
+      if (enclosing != null) {
+        final (openPos, closePos) = enclosing;
+        final newText = text.substring(0, openPos) +
+            text.substring(openPos + 1, closePos) +
+            text.substring(closePos + 1);
+        final newStart = (selection.start - 1).clamp(0, newText.length);
+        final newEnd = (selection.end - 1).clamp(0, newText.length);
+        return (
+          newText,
+          TextSelection(baseOffset: newStart, extentOffset: newEnd),
+        );
+      }
+      // Wrap single-line selection with *...*
+      final start = selection.start;
+      final end = selection.end;
+      final inner = text.substring(start, end);
+      final newText = '${text.substring(0, start)}*$inner*${text.substring(end)}';
+      return (
+        newText,
+        TextSelection(baseOffset: start + 1, extentOffset: end + 1),
+      );
+    }
+
+    // Multi-line selection: wrap each line separately
+    return _toggleBoldMultiline(text, selection);
+  }
+
+  /// Toggles bold for multi-line selections, wrapping each line's selected portion.
+  static (String, TextSelection) _toggleBoldMultiline(
+    String text,
+    TextSelection selection,
+  ) {
+    final lines = text.split('\n');
+    final (startLineIdx, startOffsetInLine) = _getLineAndOffset(text, selection.start);
+    final (endLineIdx, endOffsetInLine) = _getLineAndOffset(text, selection.end);
+
+    // Build new text with each line's selected portion wrapped
+    final newLines = <String>[];
+    var offsetAdjustment = 0;
+
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      if (i < startLineIdx || i > endLineIdx) {
+        // Line not in selection range
+        newLines.add(line);
+        continue;
+      }
+
+      // Calculate the portion of this line to wrap
+      int lineStart = (i == startLineIdx) ? startOffsetInLine : 0;
+      int lineEnd = (i == endLineIdx) ? endOffsetInLine : line.length;
+
+      // Skip if nothing selected on this line
+      if (lineStart >= lineEnd) {
+        newLines.add(line);
+        continue;
+      }
+
+      // Wrap the selected portion
+      final before = line.substring(0, lineStart);
+      final selected = line.substring(lineStart, lineEnd);
+      final after = line.substring(lineEnd);
+      newLines.add('$before*$selected*$after');
+
+      // Track adjustment for selection (each wrapped line adds 2 characters)
+      if (i == startLineIdx) {
+        offsetAdjustment += 1; // opening * before selection start
+      }
+      // For end line, we'll add the closing * adjustment later
+    }
+
+    final newText = newLines.join('\n');
+
+    // Calculate new selection: cover all the newly bolded content
+    final newStart = selection.start + offsetAdjustment;
+    final newEnd = selection.end + (endLineIdx - startLineIdx + 1) * 2 - offsetAdjustment;
+
     return (
       newText,
-      TextSelection(baseOffset: start + 1, extentOffset: end + 1),
+      TextSelection(baseOffset: newStart, extentOffset: newEnd.clamp(newStart, newText.length)),
     );
+  }
+
+  /// Returns the (lineIndex, offsetInLine) for a given absolute offset.
+  static (int, int) _getLineAndOffset(String text, int offset) {
+    var lineIdx = 0;
+    var lineStart = 0;
+    for (var i = 0; i < offset && i < text.length; i++) {
+      if (text[i] == '\n') {
+        lineIdx++;
+        lineStart = i + 1;
+      }
+    }
+    return (lineIdx, offset - lineStart);
   }
 
   /// Toggles unordered list formatting on selected lines.
@@ -87,12 +171,23 @@ class MarkdownShortcuts {
   /// Returns the (openPos, closePos) of the `*...*` span whose inner content
   /// completely contains [selStart, selEnd], or null if no such span exists.
   /// [openPos] and [closePos] are the character positions of the `*` markers.
+  ///
+  /// Also handles the empty bold case `**` (cursor between two consecutive `*`).
   static (int, int)? _findEnclosingBold(String text, int selStart, int selEnd) {
     for (final match in _boldRe.allMatches(text)) {
       final innerStart = match.start + 1; // first content char (after opening *)
       final innerEnd = match.end - 1;     // position of closing *
       if (selStart >= innerStart && selEnd <= innerEnd) {
         return (match.start, match.end - 1);
+      }
+    }
+    // Check for empty bold `**` with cursor between two consecutive `*`
+    // This is the case where user pressed cmd+b once and got `**`, now pressing again should remove it.
+    // We check: cursor position pos, text[pos-1] == '*' and text[pos] == '*'
+    if (selStart == selEnd && selStart > 0 && selStart < text.length) {
+      if (text[selStart - 1] == '*' && text[selStart] == '*') {
+        // Cursor is between two consecutive `*`, return positions of both `*`
+        return (selStart - 1, selStart);
       }
     }
     return null;

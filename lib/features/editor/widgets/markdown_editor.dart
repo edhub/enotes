@@ -25,20 +25,22 @@ class MarkdownEditor extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Base text colour matches the current markdown theme palette.
-    final textColor =
-        isDark ? const Color(0xFFABB2BF) : const Color(0xFF1F2328);
+    final textColor = isDark
+        ? const Color(0xFFABB2BF)
+        : const Color(0xFF1F2328);
 
     final hintColor = isDark ? Colors.white24 : Colors.black26;
 
-    final cursorColor =
-        isDark ? const Color(0xFF528BFF) : Theme.of(context).colorScheme.primary;
+    final cursorColor = isDark
+        ? const Color(0xFF528BFF)
+        : Theme.of(context).colorScheme.primary;
 
     return TextField(
       controller: controller,
       focusNode: focusNode,
       // Let TextField expand naturally based on content.
       // minLines ensures a minimum visual height, maxLines allows unlimited growth.
-      minLines: 3,
+      minLines: 1,
       maxLines: null,
       style: TextStyle(fontSize: 14, height: 1.6, color: textColor),
       cursorColor: cursorColor,

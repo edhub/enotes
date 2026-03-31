@@ -25,21 +25,31 @@ lib/
 ├── app.dart                         # MaterialApp + Theme + Provider 注入
 │
 ├── features/
-│   └── notes/                       # ← 唯一核心 Feature
-│       ├── models/
-│       │   ├── note.dart            # Note 数据类（不可变 createdAt）
-│       │   └── time_group.dart      # TimeGroup 枚举 + 时间分组逻辑
+│   ├── notes/                       # 笔记核心 Feature
+│   │   ├── models/
+│   │   │   ├── note.dart            # Note 数据类（不可变 createdAt）
+│   │   │   └── time_group.dart      # TimeGroup 枚举 + 时间分组逻辑
+│   │   ├── services/
+│   │   │   └── notes_service.dart   # JSON 读写（path_provider）
+│   │   ├── providers/
+│   │   │   └── notes_provider.dart  # ChangeNotifier：全量业务逻辑
+│   │   └── widgets/
+│   │       ├── timeline_kanban_view.dart   # 根布局：横向滚动 + 列编排（含 _AddNoteFab）
+│   │       ├── draft_column.dart           # 草稿列（600px），Chrome 风格 tab 栏
+│   │       ├── time_column.dart            # 时间分组列（450px）
+│   │       ├── trash_column.dart           # 回收站列（400px，最右侧）
+│   │       ├── note_card.dart              # 单条笔记卡片（inline MarkdownEditor）
+│   │       └── column_header.dart          # 吸顶列标题
+│   │
+│   └── editor/                      # 编辑器 Feature（自研 Markdown 编辑器）
+│       ├── controllers/
+│       │   └── markdown_controller.dart    # TextEditingController 子类，内联 Markdown 高亮
+│       ├── parsers/
+│       │   └── markdown_parser.dart        # 自研 Markdown → TextSpan 解析器
 │       ├── services/
-│       │   └── notes_service.dart   # JSON 读写（path_provider）
-│       ├── providers/
-│       │   └── notes_provider.dart  # ChangeNotifier：全量业务逻辑
+│       │   └── markdown_shortcuts.dart     # Cmd+B/L 快捷键逻辑（纯函数）
 │       └── widgets/
-│           ├── timeline_kanban_view.dart   # 根布局：横向滚动 + 列编排（含 _AddNoteFab）
-│           ├── draft_column.dart           # 草稿列（600px），Chrome 风格 tab 栏
-│           ├── time_column.dart            # 时间分组列（450px）
-│           ├── trash_column.dart           # 回收站列（400px，最右侧）
-│           ├── note_card.dart              # 单条笔记卡片（inline re_editor）
-│           └── column_header.dart          # 吸顶列标题
+│           └── markdown_editor.dart        # 基于 TextField 的编辑器 widget
 │
 └── core/
     ├── constants/
@@ -177,11 +187,9 @@ dependencies:
   path_provider: ^2.1.5
   intl: ^0.20.2
   uuid: ^4.5.3
-  re_editor: ^0.8.0
-  re_highlight: ^0.0.3
 ```
 
-无代码生成依赖，无复杂构建步骤。
+无代码生成依赖，无复杂构建步骤。编辑器完全自研，零额外依赖。
 
 ---
 
@@ -193,26 +201,29 @@ dependencies:
 
 ### 实现方案
 
-- 每张 `NoteCard` 的内容区域使用 `re_editor` 的 `CodeEditor` widget
-- 使用 `re_highlight` 的 `langMarkdown` 规则实现 Markdown 语法着色
-- `CodeLineEditingController` 持有内容；文字变动时防抖自动保存（调用 `provider.updateNote`）
+编辑器完全自研，基于 Flutter 原生 `TextField`，**不依赖任何第三方编辑器库**。
+
+- 每张 `NoteCard` 使用 `MarkdownEditor` widget（`features/editor/widgets/markdown_editor.dart`）
+- `MarkdownController extends TextEditingController`：重写 `buildTextSpan`，通过 `MarkdownParser` 将文本实时解析为带样式的 `TextSpan` 树，实现 editor-mode Markdown 高亮（语法符号保留可见，光标位置始终准确）
+- `MarkdownParser`：纯 Dart 自研解析器，支持标题、引用、列表、水平线、粗体、删除线、高亮、行内代码、链接，解析结果按 `(text, isDark)` 缓存
+- `TextField(maxLines: null)`：卡片随内容高度自然撑开，无内部滚动
 - `FocusNode` 用于检测编辑状态，聚焦时卡片边框高亮，失焦时触发立即保存
-- `Cmd+S` 触发显式保存（re_editor 内置该快捷键，监听 `onSave` 回调）
-- `CodeEditor` 禁用内部垂直滚动（`NeverScrollableScrollPhysics`），卡片随内容高度自然撑开
-- 水平方向开启 word wrap，无需横向滚动
+- 文字变动时 600ms 防抖自动保存（调用 `provider.updateNote`）
+- `MarkdownShortcuts`（纯函数）处理快捷键：
+  - `Cmd+B`：Toggle bold（`*...*`）
+  - `Cmd+L`：Toggle unordered list（`- `）
+  - `Shift+Cmd+L`：Toggle ordered list（`1. `）
+  - `ESC`：失焦
+
+### 选区行为说明
+
+- 多行选区中，**中间完整选中的行**，高亮背景会延伸到最长行的宽度，形成矩形选区块
+- 这是 Flutter `TextField` engine 级别的渲染行为，**符合预期，非 bug**
 
 ### 新建笔记流程
 
-- 点击 FAB → 在 Today 列顶部插入一条空笔记 → 自动滚动到该笔记 → 自动聚焦 `CodeEditor`
+- 点击 FAB → 在 Today 列顶部插入一条空笔记 → 自动滚动到该笔记 → 自动聚焦 `MarkdownEditor`
 - 草稿同理：插入草稿列第一槽，自动聚焦
-
-### 依赖
-
-```yaml
-dependencies:
-  re_editor: ^0.8.0      # Inline CodeEditor，Markdown 高亮，Cmd+S 快捷键
-  re_highlight: ^0.0.3   # 语言定义与主题，note_card.dart 直接导入，需显式声明
-```
 
 ---
 

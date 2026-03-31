@@ -103,12 +103,20 @@ class _NoteCardState extends State<NoteCard> {
     }
 
     // Check for Cmd (macOS) / Ctrl (other platforms) modifier
-    final isCmd = HardwareKeyboard.instance.isLogicalKeyPressed(
-            LogicalKeyboardKey.metaLeft) ||
-        HardwareKeyboard.instance.isLogicalKeyPressed(LogicalKeyboardKey.metaRight);
-    final isShift = HardwareKeyboard.instance.isLogicalKeyPressed(
-            LogicalKeyboardKey.shiftLeft) ||
-        HardwareKeyboard.instance.isLogicalKeyPressed(LogicalKeyboardKey.shiftRight);
+    final isCmd =
+        HardwareKeyboard.instance.isLogicalKeyPressed(
+          LogicalKeyboardKey.metaLeft,
+        ) ||
+        HardwareKeyboard.instance.isLogicalKeyPressed(
+          LogicalKeyboardKey.metaRight,
+        );
+    final isShift =
+        HardwareKeyboard.instance.isLogicalKeyPressed(
+          LogicalKeyboardKey.shiftLeft,
+        ) ||
+        HardwareKeyboard.instance.isLogicalKeyPressed(
+          LogicalKeyboardKey.shiftRight,
+        );
 
     if (!isCmd) return KeyEventResult.ignored;
 
@@ -137,7 +145,10 @@ class _NoteCardState extends State<NoteCard> {
   void _applyShortcut(
     (String, TextSelection) Function(String, TextSelection) shortcut,
   ) {
-    final (newText, newSelection) = shortcut(_controller.text, _controller.selection);
+    final (newText, newSelection) = shortcut(
+      _controller.text,
+      _controller.selection,
+    );
     _updatingController = true;
     _controller.text = newText;
     _controller.selection = newSelection;
@@ -169,7 +180,7 @@ class _NoteCardState extends State<NoteCard> {
 
   // Minimum visual height: 3 lines of text + top/bottom padding.
   static const _minLineHeight = 14.0 * 1.6; // fontSize * lineHeight
-  static const _minContentHeight = 3 * _minLineHeight;
+  static const _minContentHeight = 1 * _minLineHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -184,7 +195,8 @@ class _NoteCardState extends State<NoteCard> {
         ? (nc?.draftCardBackground ?? Theme.of(context).cardTheme.color)
         : Theme.of(context).cardTheme.color;
 
-    final minCardHeight = widget.minHeight ??
+    final minCardHeight =
+        widget.minHeight ??
         (_minContentHeight + LayoutConstants.cardPadding * 2);
 
     return MouseRegion(
@@ -233,7 +245,6 @@ class _NoteCardState extends State<NoteCard> {
       ),
     );
   }
-
 }
 
 // ── Global note-info menu (singleton OverlayEntry) ───────────────────────────
@@ -479,11 +490,7 @@ class _InfoPopover extends StatelessWidget {
 }
 
 class _TimeRow extends StatelessWidget {
-  const _TimeRow({
-    required this.icon,
-    required this.label,
-    required this.time,
-  });
+  const _TimeRow({required this.icon, required this.label, required this.time});
 
   final IconData icon;
   final String label;
@@ -501,10 +508,7 @@ class _TimeRow extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: TextStyle(fontSize: 10, color: secondary),
-            ),
+            Text(label, style: TextStyle(fontSize: 10, color: secondary)),
             const SizedBox(height: 1),
             Text(
               _format(time),
@@ -527,8 +531,19 @@ class _TimeRow extends StatelessWidget {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[local.month]} ${local.day},  '
         '${local.hour.toString().padLeft(2, '0')}:'
@@ -566,8 +581,8 @@ class _DeleteRowState extends State<_DeleteRow> {
           decoration: BoxDecoration(
             color: _hovered
                 ? (isDark
-                    ? Colors.red.withValues(alpha: 0.12)
-                    : Colors.red.withValues(alpha: 0.06))
+                      ? Colors.red.withValues(alpha: 0.12)
+                      : Colors.red.withValues(alpha: 0.06))
                 : Colors.transparent,
             borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(10),
@@ -577,8 +592,11 @@ class _DeleteRowState extends State<_DeleteRow> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             children: [
-              Icon(Icons.delete_outline_rounded,
-                  size: 14, color: Colors.red.shade400),
+              Icon(
+                Icons.delete_outline_rounded,
+                size: 14,
+                color: Colors.red.shade400,
+              ),
               const SizedBox(width: 10),
               Text(
                 'Move to Trash',
@@ -591,5 +609,3 @@ class _DeleteRowState extends State<_DeleteRow> {
     );
   }
 }
-
-

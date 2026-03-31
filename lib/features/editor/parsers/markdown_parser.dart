@@ -35,14 +35,14 @@ class _Colors {
   );
 
   static const light = _Colors(
-    heading: Color(0xFF0550AE),
-    quote: Color(0xFF9CA3AF),
-    list: Color(0xFF9CA3AF),
-    link: Color(0xFF0969DA),
-    codeText: Color(0xFF383A42),
-    codeBg: Color(0xFFF0F0F0),
-    punct: Color(0xFFBBBEC5),
-    highlightBg: Color(0xFFFFF8CC),
+    heading: Color(0xFF2F3337),
+    quote: Color(0xFF666666),
+    list: Color(0xFFE05953),
+    link: Color(0xFFE05953),
+    codeText: Color(0xFF47494E),
+    codeBg: Color(0xFFF3F3F3),
+    punct: Color(0xFFD1D1D1),
+    highlightBg: Color(0xFFFFF5B1),
   );
 }
 
@@ -58,7 +58,6 @@ class _Colors {
 /// - Blockquotes `>`
 /// - Unordered lists `- / * / +`
 /// - Ordered lists `1.`
-/// - Fenced code blocks ` ``` `
 /// - Horizontal rules `---`
 /// - Inline: bold (`*`/`**`/`***`/`_`/`__`),
 ///   strikethrough (`~~`), highlight (`==`), inline code (`` ` ``),
@@ -69,7 +68,7 @@ class MarkdownParser {
 
   static const _mono = 'monospace';
 
-  static const _headingSizes = [26.0, 22.0, 19.0, 17.0, 15.0, 14.0];
+  static const _headingSizes = [15.0, 15.0, 15.0, 14.0, 14.0, 14.0];
 
   /// Build a [TextSpan] tree from [text].
   static TextSpan buildSpan({
@@ -84,7 +83,6 @@ class MarkdownParser {
 
   // ── Line-level ─────────────────────────────────────────────────────────────
 
-  static final _fenceRe = RegExp(r'^\s*```');
   static final _headingRe = RegExp(r'^(#{1,6})(\s.*)$');
   static final _hrRe = RegExp(r'^(\*{3,}|-{3,}|_{3,})\s*$');
   static final _quoteRe = RegExp(r'^(>+\s*)(.*)$');
@@ -94,19 +92,10 @@ class MarkdownParser {
   static TextSpan _buildLines(String text, TextStyle base, _Colors c) {
     final lines = text.split('\n');
     final spans = <InlineSpan>[];
-    var inFencedCode = false;
 
     for (var i = 0; i < lines.length; i++) {
       final line = lines[i];
-
-      if (_fenceRe.hasMatch(line)) {
-        inFencedCode = !inFencedCode;
-        spans.add(_codeLineSpan(line, base, c));
-      } else if (inFencedCode) {
-        spans.add(_codeLineSpan(line, base, c));
-      } else {
-        spans.add(_parseLine(line, base, c));
-      }
+      spans.add(_parseLine(line, base, c));
 
       if (i < lines.length - 1) {
         spans.add(TextSpan(text: '\n', style: base));
@@ -115,16 +104,6 @@ class MarkdownParser {
 
     return TextSpan(style: base, children: spans);
   }
-
-  static TextSpan _codeLineSpan(String line, TextStyle base, _Colors c) =>
-      TextSpan(
-        text: line,
-        style: base.copyWith(
-          fontFamily: _mono,
-          color: c.codeText,
-          backgroundColor: c.codeBg,
-        ),
-      );
 
   static TextSpan _parseLine(String line, TextStyle base, _Colors c) {
     if (line.isEmpty) return TextSpan(text: '', style: base);
@@ -135,7 +114,7 @@ class MarkdownParser {
       final level = (hm.group(1)!.length - 1).clamp(0, 5);
       final headStyle = base.copyWith(
         fontSize: _headingSizes[level],
-        fontWeight: FontWeight.bold,
+        fontWeight: FontWeight.w600,
         color: c.heading,
       );
       // group(1) = "#+" prefix, group(2) = " text" (space included).
@@ -151,7 +130,10 @@ class MarkdownParser {
 
     // Horizontal rule
     if (_hrRe.hasMatch(line)) {
-      return TextSpan(text: line, style: base.copyWith(color: c.punct));
+      return TextSpan(
+        text: line,
+        style: base.copyWith(color: c.punct),
+      );
     }
 
     // Blockquote
@@ -176,7 +158,14 @@ class MarkdownParser {
       return TextSpan(
         style: base,
         children: [
-          TextSpan(text: um.group(1), style: base.copyWith(color: c.list)),
+          TextSpan(
+            text: um.group(1),
+            style: base.copyWith(
+              color: c.list,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 4,
+            ),
+          ),
           ..._parseInline(um.group(2)!, base, c),
         ],
       );
@@ -188,7 +177,10 @@ class MarkdownParser {
       return TextSpan(
         style: base,
         children: [
-          TextSpan(text: om.group(1), style: base.copyWith(color: c.list)),
+          TextSpan(
+            text: om.group(1),
+            style: base.copyWith(color: c.list, letterSpacing: 2),
+          ),
           ..._parseInline(om.group(2)!, base, c),
         ],
       );
@@ -207,11 +199,7 @@ class MarkdownParser {
   /// the "consumed delimiter" false-positive where the closing `**` of a bold
   /// span can form a spurious opening `*` for the next italic span when all
   /// matches are collected up-front with a single pass.
-  static List<InlineSpan> _parseInline(
-    String text,
-    TextStyle base,
-    _Colors c,
-  ) {
+  static List<InlineSpan> _parseInline(String text, TextStyle base, _Colors c) {
     if (text.isEmpty) return const [];
 
     final spans = <InlineSpan>[];

@@ -70,6 +70,44 @@ void main() {
         expect(text, 'hel**lo *world*');
         expect(sel.extentOffset, 4);
       });
+
+      test('cursor inside empty ** removes it', () {
+        // Empty bold: cursor between two consecutive `*` (after pressing cmd+b once)
+        // **| -> cursor at position 1
+        final (text, sel) = MarkdownShortcuts.toggleBold('hello **world', _sel(7));
+        expect(text, 'hello world');
+        expect(sel.extentOffset, 6);
+      });
+
+      test('cursor between ** at start of text removes it', () {
+        // **| text -> cursor at position 1
+        final (text, sel) = MarkdownShortcuts.toggleBold('** text', _sel(1));
+        expect(text, ' text');
+        expect(sel.extentOffset, 0);
+      });
+
+      test('cursor between ** at end of text removes it', () {
+        // 'text **' -> t=0,e=1,x=2,t=3,space=4,*=5,*=6
+        // cursor at position 6 (between the two `*`) -> removes both
+        final (text, sel) = MarkdownShortcuts.toggleBold('text **', _sel(6));
+        expect(text, 'text ');
+        expect(sel.extentOffset, 5);
+      });
+
+      test('cursor after single * at end inserts **', () {
+        // 'text *' -> t=0,e=1,x=2,t=3,space=4,*=5
+        // cursor at position 5 -> inserts ** at cursor, result is 'text ***'
+        final (text, sel) = MarkdownShortcuts.toggleBold('text *', _sel(5));
+        expect(text, 'text ***');
+        expect(sel.extentOffset, 6);
+      });
+
+      test('cursor inside empty ** in middle of text removes it', () {
+        // before **|after -> cursor at position 8
+        final (text, sel) = MarkdownShortcuts.toggleBold('before **after', _sel(8));
+        expect(text, 'before after');
+        expect(sel.extentOffset, 7);
+      });
     });
 
     group('with selection', () {
@@ -133,6 +171,77 @@ void main() {
         expect(first.$1, '这是*重要内容*');
         final second = MarkdownShortcuts.toggleBold(first.$1, first.$2);
         expect(second.$1, original);
+      });
+    });
+
+    group('multiline selection', () {
+      test('wraps each full line separately', () {
+        // 'line1\nline2\nline3' -> select from 0 to end
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'line1\nline2\nline3',
+          _range(0, 17),
+        );
+        expect(text, '*line1*\n*line2*\n*line3*');
+      });
+
+      test('wraps each line with partial selection', () {
+        // 'hello\nworld' -> select 'ello\nwor' (positions 1-9)
+        // h|ello|\n|wor|ld -> *ello*\n*wor*ld
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'hello\nworld',
+          _range(1, 9),
+        );
+        expect(text, 'h*ello*\n*wor*ld');
+      });
+
+      test('wraps Chinese lines separately', () {
+        // '第一行\n第二行' -> full selection
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          '第一行\n第二行',
+          _range(0, 7),
+        );
+        expect(text, '*第一行*\n*第二行*');
+      });
+
+      test('wraps partial Chinese lines', () {
+        // '这是第一行\n这是第二行' -> positions: 这=0,是=1,第=2,一=3,行=4,\n=5,这=6,是=7,第=8,二=9,行=10
+        // select positions 2-10: 第一行\n这是第二 (第,一,行,\n,这,是,第,二)
+        // result: 这是*第一行*\n*这是第二*行
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          '这是第一行\n这是第二行',
+          _range(2, 10),
+        );
+        expect(text, '这是*第一行*\n*这是第二*行');
+      });
+
+      test('single line selection (no newline) still works', () {
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'hello world',
+          _range(0, 11),
+        );
+        expect(text, '*hello world*');
+      });
+
+      test('empty lines in selection are skipped', () {
+        // 'line1\n\nline3' -> select all
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'line1\n\nline3',
+          _range(0, 12),
+        );
+        expect(text, '*line1*\n\n*line3*');
+      });
+
+      test('selection starting mid-line, ending mid-line', () {
+        // 'abc\ndef\nghi' -> positions: a=0, b=1, c=2, \n=3, d=4, e=5, f=6, \n=7, g=8, h=9, i=10
+        // select positions 2-10 (c\ndef\ngh) -> each portion wrapped separately
+        // line 0: 'abc' -> wrap [2:3]='c' -> 'ab*c*'
+        // line 1: 'def' -> wrap [0:3]='def' -> '*def*'
+        // line 2: 'ghi' -> wrap [0:2]='gh' -> '*gh*i'
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'abc\ndef\nghi',
+          _range(2, 10),
+        );
+        expect(text, 'ab*c*\n*def*\n*gh*i');
       });
     });
   });
