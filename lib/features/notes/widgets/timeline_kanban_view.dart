@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../providers/notes_provider.dart';
+import '../services/export_service.dart';
 import 'draft_column.dart';
 import 'time_column.dart';
 import 'trash_column.dart';
@@ -67,13 +68,29 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          _buildScrollArea(context),
-          _buildJumpButton(),
-          _buildFab(context),
-        ],
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () {
+          // Scroll horizontal view back to the start (Today column).
+          _hScroll.animateTo(
+            0,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOut,
+          );
+          context.read<NotesProvider>().requestNewNoteFocus();
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          body: Stack(
+            children: [
+              _buildScrollArea(context),
+              _buildJumpButton(),
+              const _DataMenuButton(),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -145,26 +162,127 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
       ),
     );
   }
-
-  Widget _buildFab(BuildContext context) {
-    return const Positioned(
-      right: 24,
-      bottom: 24,
-      child: _AddNoteFab(),
-    );
-  }
 }
 
-class _AddNoteFab extends StatelessWidget {
-  const _AddNoteFab();
+// ── Data menu (import / export) ────────────────────────────────────────────
+
+enum _MenuAction { exportJson, exportMarkdown, importJson }
+
+/// Fixed top-right button that opens the import / export popup menu.
+class _DataMenuButton extends StatefulWidget {
+  const _DataMenuButton();
+
+  @override
+  State<_DataMenuButton> createState() => _DataMenuButtonState();
+}
+
+class _DataMenuButtonState extends State<_DataMenuButton> {
+  final _export = const ExportService();
 
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton(
-      heroTag: 'addNote',
-      tooltip: 'New note',
-      onPressed: () => context.read<NotesProvider>().addNote(''),
-      child: const Icon(Icons.add),
+    return Positioned(
+      right: 24,
+      top: 16,
+      child: PopupMenuButton<_MenuAction>(
+        icon: const Icon(Icons.more_vert),
+        tooltip: 'Import / Export',
+        onSelected: _handleAction,
+        itemBuilder: (_) => const [
+          PopupMenuItem(
+            value: _MenuAction.exportJson,
+            child: ListTile(
+              leading: Icon(Icons.backup_outlined),
+              title: Text('Export JSON (full backup)'),
+              contentPadding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+          PopupMenuItem(
+            value: _MenuAction.exportMarkdown,
+            child: ListTile(
+              leading: Icon(Icons.description_outlined),
+              title: Text('Export Markdown (plain text)'),
+              contentPadding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+          PopupMenuDivider(),
+          PopupMenuItem(
+            value: _MenuAction.importJson,
+            child: ListTile(
+              leading: Icon(Icons.restore_outlined),
+              title: Text('Import JSON…'),
+              contentPadding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleAction(_MenuAction action) async {
+    final provider = context.read<NotesProvider>();
+
+    switch (action) {
+      case _MenuAction.exportJson:
+        final result = await _export.exportJson(provider.allNotes);
+        if (!mounted || result == null) return;
+        _snack(result ? '✓ JSON backup saved' : 'Export failed — check logs');
+
+      case _MenuAction.exportMarkdown:
+        final result = await _export.exportMarkdown(provider.allNotes);
+        if (!mounted || result == null) return;
+        _snack(result ? '✓ Markdown export saved' : 'Export failed — check logs');
+
+      case _MenuAction.importJson:
+        final confirmed = await _confirmImport();
+        if (!mounted || !confirmed) return;
+        final notes = await _export.importJson();
+        if (!mounted) return;
+        if (notes == null) {
+          _snack('Import failed — invalid or unsupported file');
+          return;
+        }
+        if (notes.isEmpty) return; // user cancelled the file picker
+        await provider.importNotes(notes);
+        if (!mounted) return;
+        _snack('✓ Imported ${notes.length} notes');
+    }
+  }
+
+  Future<bool> _confirmImport() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Import Notes'),
+        content: const Text(
+          'This will replace ALL current notes with the contents of the '
+          'selected file. This cannot be undone.\n\nContinue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Replace All'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  void _snack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        width: 360,
+      ),
     );
   }
 }

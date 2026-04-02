@@ -33,11 +33,16 @@ class NotesProvider extends ChangeNotifier {
   int _activeDraftIndex = 0;
   Timer? _saveTimer;
 
-  /// ID of the note that should receive focus on its next build.
-  String? _pendingFocusNoteId;
-  String? get pendingFocusNoteId => _pendingFocusNoteId;
+  /// Incremented each time the user requests focus on the new-note composer
+  /// (e.g. via Cmd+K). Widgets listen and request focus whenever this changes.
+  int _newNoteFocusRequest = 0;
+  int get newNoteFocusRequest => _newNoteFocusRequest;
 
-  void clearPendingFocus() => _pendingFocusNoteId = null;
+  /// Signals the Today column's new-note composer to take keyboard focus.
+  void requestNewNoteFocus() {
+    _newNoteFocusRequest++;
+    notifyListeners();
+  }
 
   // ── Computed views ─────────────────────────────────────────────────────────
 
@@ -55,9 +60,12 @@ class NotesProvider extends ChangeNotifier {
 
   /// Non-draft, non-deleted notes grouped into time columns, sorted most-recent first.
   /// Notes within each column preserve [_notes] insertion order (stable).
+  /// The 'today' bucket is always present even when empty, so the composer
+  /// that lives at the top of the Today column is always reachable.
   List<TimeColumnData> get timeColumns {
     final now = DateTime.now();
-    final Map<String, List<Note>> buckets = {};
+    // Pre-seed today so the column is always rendered.
+    final Map<String, List<Note>> buckets = {'today': []};
 
     for (final note in _notes.where((n) => !n.isDraft && !n.isDeleted)) {
       final key = TimeGroupHelper.bucketKey(note.createdAt, now: now);
@@ -76,6 +84,9 @@ class NotesProvider extends ChangeNotifier {
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
   }
 
+  /// All notes (for backup export). Includes drafts and soft-deleted.
+  List<Note> get allNotes => List<Note>.unmodifiable(_notes);
+
   /// Soft-deleted notes, sorted by deletion time (most recently deleted first).
   List<Note> get trashedNotes {
     return _notes
@@ -86,11 +97,10 @@ class NotesProvider extends ChangeNotifier {
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
-  /// Adds a new regular (non-draft) note.
+  /// Adds a new regular (non-draft) note at the top of the list.
   void addNote(String content) {
     final note = Note.create(content: content, isDraft: false);
     _notes.insert(0, note);
-    _pendingFocusNoteId = note.id;
     _commitAndNotify();
   }
 
@@ -138,6 +148,26 @@ class NotesProvider extends ChangeNotifier {
   void emptyTrash() {
     _notes.removeWhere((n) => n.isDeleted);
     _commitAndNotify();
+  }
+
+  /// Replaces ALL notes with [notes] (full overwrite — used by import).
+  ///
+  /// Draft slots are re-ensured after the replace. Saves to disk immediately
+  /// (no debounce) so the caller can await completion.
+  Future<void> importNotes(List<Note> notes) async {
+    _notes
+      ..clear()
+      ..addAll(notes);
+    // Re-ensure draft slots without the internal unawaited save.
+    final draftCount = _notes.where((n) => n.isDraft).length;
+    for (var i = draftCount; i < LayoutConstants.maxDraftNotes; i++) {
+      _notes.add(Note.create(content: '', isDraft: true));
+    }
+    _activeDraftIndex = 0;
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    await _service.saveNotes(List<Note>.unmodifiable(_notes));
+    notifyListeners();
   }
 
   /// Switches the visible draft card. Clamps to valid range automatically.

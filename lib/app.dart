@@ -38,6 +38,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _provider.dispose();
+    widget.service.dispose(); // Close the SQLite connection.
     super.dispose();
   }
 

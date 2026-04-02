@@ -1,51 +1,108 @@
-import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:sqlite3/sqlite3.dart';
 
+import '../../../../core/env/app_env.dart';
 import '../models/note.dart';
 
-/// Handles reading and writing notes to a local JSON file.
+/// SQLite-backed note storage.
 ///
-/// File location: {appDocumentsDir}/enotes/notes.json
+/// **Must call [init] once before any other method** (in [main]).
+///
+/// Database location (macOS Application Support container):
+///   Release        → `enotes.db`
+///   Debug/Profile  → `enotes_dev.db`
+///
+/// WAL mode is enabled for better write performance and crash safety.
 class NotesService {
-  static const _dirName = 'enotes';
-  static const _fileName = 'notes.json';
+  Database? _db;
 
-  Future<File> _resolveFile() async {
-    final base = await getApplicationDocumentsDirectory();
-    final dir = Directory('${base.path}/$_dirName');
-    if (!dir.existsSync()) {
-      await dir.create(recursive: true);
+  /// Opens (or creates) the SQLite database and ensures the schema exists.
+  Future<void> init() async {
+    final support = await getApplicationSupportDirectory();
+    if (!Directory(support.path).existsSync()) {
+      Directory(support.path).createSync(recursive: true);
     }
-    return File('${dir.path}/$_fileName');
+    final path = '${support.path}/${AppEnv.dbFileName}';
+    _db = sqlite3.open(path);
+    _db!.execute('PRAGMA journal_mode=WAL;');
+    _createSchema();
+    log('NotesService: opened ${AppEnv.dbFileName} at ${support.path}');
   }
 
-  /// Loads all notes from disk. Returns an empty list on any error.
+  void _createSchema() {
+    _db!.execute('''
+      CREATE TABLE IF NOT EXISTS notes (
+        id         TEXT    PRIMARY KEY,
+        content    TEXT    NOT NULL,
+        created_at TEXT    NOT NULL,
+        updated_at TEXT    NOT NULL,
+        is_draft   INTEGER NOT NULL DEFAULT 0,
+        deleted_at TEXT
+      )
+    ''');
+  }
+
+  /// Loads all notes from the database. Returns an empty list on any error.
   Future<List<Note>> loadNotes() async {
     try {
-      final file = await _resolveFile();
-      if (!file.existsSync()) return [];
-      final raw = await file.readAsString();
-      final list = jsonDecode(raw) as List<dynamic>;
-      return list
-          .map((e) => Note.fromJson(e as Map<String, dynamic>))
-          .toList();
+      return _db!.select('SELECT * FROM notes').map(_rowToNote).toList();
     } catch (e, st) {
       log('NotesService.loadNotes failed: $e', error: e, stackTrace: st);
       return [];
     }
   }
 
-  /// Persists all notes to disk. Logs errors without throwing.
+  /// Atomically replaces all notes with [notes] inside a single transaction.
+  ///
+  /// Uses DELETE + INSERT rather than UPSERT so that permanently deleted notes
+  /// are also removed from the DB when the provider removes them from its list.
   Future<void> saveNotes(List<Note> notes) async {
+    final db = _db;
+    if (db == null) return;
     try {
-      final file = await _resolveFile();
-      final encoded = jsonEncode(notes.map((n) => n.toJson()).toList());
-      await file.writeAsString(encoded);
+      db.execute('BEGIN');
+      db.execute('DELETE FROM notes');
+      final stmt = db.prepare(
+        'INSERT INTO notes (id, content, created_at, updated_at, is_draft, deleted_at) '
+        'VALUES (?, ?, ?, ?, ?, ?)',
+      );
+      for (final n in notes) {
+        stmt.execute([
+          n.id,
+          n.content,
+          n.createdAt.toIso8601String(),
+          n.updatedAt.toIso8601String(),
+          n.isDraft ? 1 : 0,
+          n.deletedAt?.toIso8601String(),
+        ]);
+      }
+      stmt.dispose();
+      db.execute('COMMIT');
     } catch (e, st) {
+      db.execute('ROLLBACK');
       log('NotesService.saveNotes failed: $e', error: e, stackTrace: st);
     }
   }
+
+  /// Closes the database connection. Safe to call multiple times.
+  void dispose() {
+    _db?.dispose();
+    _db = null;
+  }
+
+  // ── Private helpers ────────────────────────────────────────────────────────
+
+  Note _rowToNote(Row row) => Note(
+        id: row['id'] as String,
+        content: row['content'] as String,
+        createdAt: DateTime.parse(row['created_at'] as String),
+        updatedAt: DateTime.parse(row['updated_at'] as String),
+        isDraft: (row['is_draft'] as int) == 1,
+        deletedAt: row['deleted_at'] != null
+            ? DateTime.parse(row['deleted_at'] as String)
+            : null,
+      );
 }

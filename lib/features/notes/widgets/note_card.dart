@@ -51,15 +51,6 @@ class _NoteCardState extends State<NoteCard> {
     _focusNode = FocusNode(onKeyEvent: _handleKeyEvent)
       ..addListener(_onFocusChanged);
     _controller.addListener(_onTextChanged);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final provider = context.read<NotesProvider>();
-      if (provider.pendingFocusNoteId == widget.note.id) {
-        provider.clearPendingFocus();
-        _focusNode.requestFocus();
-      }
-    });
   }
 
   @override
