@@ -14,11 +14,13 @@ class MarkdownEditor extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     this.hint,
+    this.minLines,
   });
 
   final MarkdownController controller;
   final FocusNode focusNode;
   final String? hint;
+  final int? minLines;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +42,7 @@ class MarkdownEditor extends StatelessWidget {
       focusNode: focusNode,
       // Let TextField expand naturally based on content.
       // minLines ensures a minimum visual height, maxLines allows unlimited growth.
-      minLines: 1,
+      minLines: minLines ?? 1,
       maxLines: null,
       style: TextStyle(fontSize: 14, height: 1.6, color: textColor),
       cursorColor: cursorColor,

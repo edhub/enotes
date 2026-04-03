@@ -33,13 +33,39 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
   void initState() {
     super.initState();
     _hScroll.addListener(_onHScroll);
+    // Register a global hardware-keyboard handler so that Cmd+K fires even
+    // when no widget inside this tree currently holds focus (e.g. after the
+    // user switches to another window and returns without clicking anything).
+    HardwareKeyboard.instance.addHandler(_handleGlobalKey);
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
     _hScroll.removeListener(_onHScroll);
     _hScroll.dispose();
     super.dispose();
+  }
+
+  /// Global key handler: intercepts Cmd+K regardless of focus state.
+  ///
+  /// Returns `true` to consume the event (prevent further propagation)
+  /// only when the shortcut matches, so all other keys pass through normally.
+  bool _handleGlobalKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final isMetaK =
+        event.logicalKey == LogicalKeyboardKey.keyK &&
+        HardwareKeyboard.instance.isMetaPressed;
+    if (!isMetaK) return false;
+
+    _hScroll.animateTo(
+      0,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
+    );
+    // Use the BuildContext safely — the widget is still mounted at this point.
+    context.read<NotesProvider>().requestNewNoteFocus();
+    return true; // consumed
   }
 
   void _onHScroll() {
@@ -68,21 +94,7 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
 
   @override
   Widget build(BuildContext context) {
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () {
-          // Scroll horizontal view back to the start (Today column).
-          _hScroll.animateTo(
-            0,
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeInOut,
-          );
-          context.read<NotesProvider>().requestNewNoteFocus();
-        },
-      },
-      child: Focus(
-        autofocus: true,
-        child: Scaffold(
+    return Scaffold(
           body: Stack(
             children: [
               _buildScrollArea(context),
@@ -90,9 +102,7 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
               const _DataMenuButton(),
             ],
           ),
-        ),
-      ),
-    );
+        );
   }
 
   Widget _buildScrollArea(BuildContext context) {

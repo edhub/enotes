@@ -25,12 +25,14 @@ class NoteCard extends StatefulWidget {
     required this.isDraftView,
     required this.columnWidth,
     this.minHeight,
+    this.minLines,
   });
 
   final Note note;
   final bool isDraftView;
   final double columnWidth;
   final double? minHeight;
+  final int? minLines;
 
   @override
   State<NoteCard> createState() => _NoteCardState();
@@ -169,9 +171,9 @@ class _NoteCardState extends State<NoteCard> {
 
   // ── Build ──────────────────────────────────────────────────────────────────
 
-  // Minimum visual height: 3 lines of text + top/bottom padding.
+  // Minimum visual height: minLines lines of text + top/bottom padding.
   static const _minLineHeight = 14.0 * 1.6; // fontSize * lineHeight
-  static const _minContentHeight = 1 * _minLineHeight;
+  static const _defaultMinLines = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -186,9 +188,11 @@ class _NoteCardState extends State<NoteCard> {
         ? (nc?.draftCardBackground ?? Theme.of(context).cardTheme.color)
         : Theme.of(context).cardTheme.color;
 
+    final minLines = widget.minLines ?? _defaultMinLines;
+    final minContentHeight = minLines * _minLineHeight;
     final minCardHeight =
         widget.minHeight ??
-        (_minContentHeight + LayoutConstants.cardPadding * 2);
+        (minContentHeight + LayoutConstants.cardPadding * 2);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -219,6 +223,7 @@ class _NoteCardState extends State<NoteCard> {
               controller: _controller,
               focusNode: _focusNode,
               hint: 'Start writing…',
+              minLines: minLines,
             ),
             // ⋯ button floats at top-right; zero layout impact.
             Positioned(

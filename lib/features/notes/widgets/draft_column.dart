@@ -33,8 +33,10 @@ class DraftColumn extends StatelessWidget {
       child: Consumer<NotesProvider>(
         builder: (context, provider, _) {
           final drafts = provider.draftNotes;
-          final safeIndex =
-              provider.activeDraftIndex.clamp(0, drafts.length - 1);
+          final safeIndex = provider.activeDraftIndex.clamp(
+            0,
+            drafts.length - 1,
+          );
 
           return Column(
             children: [
@@ -62,6 +64,7 @@ class DraftColumn extends StatelessWidget {
                         isDraftView: true,
                         columnWidth: LayoutConstants.draftColumnWidth,
                         minHeight: _cardHeight,
+                        minLines: 30,
                       ),
                     ),
                   ),
@@ -196,9 +199,13 @@ class _ChromeTabState extends State<_ChromeTab> {
     // ── Inactive tab ────────────────────────────────────────────────────────
     final hoverBg = isDark
         ? Color.alphaBlend(
-            Colors.white.withValues(alpha: 0.07), widget.inactiveBg)
+            Colors.white.withValues(alpha: 0.07),
+            widget.inactiveBg,
+          )
         : Color.alphaBlend(
-            Colors.black.withValues(alpha: 0.05), widget.inactiveBg);
+            Colors.black.withValues(alpha: 0.05),
+            widget.inactiveBg,
+          );
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
