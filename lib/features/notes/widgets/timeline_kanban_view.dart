@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../providers/notes_provider.dart';
@@ -18,14 +18,15 @@ import 'trash_column.dart';
 /// horizontal [ScrollController].
 ///
 /// Columns: Draft | Today | Yesterday | … | Recently Deleted
-class TimelineKanbanView extends StatefulWidget {
+class TimelineKanbanView extends ConsumerStatefulWidget {
   const TimelineKanbanView({super.key});
 
   @override
-  State<TimelineKanbanView> createState() => _TimelineKanbanViewState();
+  ConsumerState<TimelineKanbanView> createState() =>
+      _TimelineKanbanViewState();
 }
 
-class _TimelineKanbanViewState extends State<TimelineKanbanView> {
+class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
   final _hScroll = ScrollController();
   bool _showJumpButton = false;
 
@@ -64,7 +65,7 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
       curve: Curves.easeInOut,
     );
     // Use the BuildContext safely — the widget is still mounted at this point.
-    context.read<NotesProvider>().requestNewNoteFocus();
+    ref.read(notesProvider.notifier).requestNewNoteFocus();
     return true; // consumed
   }
 
@@ -130,8 +131,7 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
   }
 
   Widget _buildRow(BuildContext context, double availH) {
-    final provider = context.watch<NotesProvider>();
-    final columns = provider.timeColumns;
+    final columns = ref.watch(notesProvider.select((s) => s.timeColumns));
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,14 +179,14 @@ class _TimelineKanbanViewState extends State<TimelineKanbanView> {
 enum _MenuAction { exportJson, exportMarkdown, importJson }
 
 /// Fixed top-right button that opens the import / export popup menu.
-class _DataMenuButton extends StatefulWidget {
+class _DataMenuButton extends ConsumerStatefulWidget {
   const _DataMenuButton();
 
   @override
-  State<_DataMenuButton> createState() => _DataMenuButtonState();
+  ConsumerState<_DataMenuButton> createState() => _DataMenuButtonState();
 }
 
-class _DataMenuButtonState extends State<_DataMenuButton> {
+class _DataMenuButtonState extends ConsumerState<_DataMenuButton> {
   final _export = const ExportService();
 
   @override
@@ -233,16 +233,20 @@ class _DataMenuButtonState extends State<_DataMenuButton> {
   }
 
   Future<void> _handleAction(_MenuAction action) async {
-    final provider = context.read<NotesProvider>();
+    final notifier = ref.read(notesProvider.notifier);
 
     switch (action) {
       case _MenuAction.exportJson:
-        final result = await _export.exportJson(provider.allNotes);
+        final result = await _export.exportJson(
+          ref.read(notesProvider).allNotes,
+        );
         if (!mounted || result == null) return;
         _snack(result ? '✓ JSON backup saved' : 'Export failed — check logs');
 
       case _MenuAction.exportMarkdown:
-        final result = await _export.exportMarkdown(provider.allNotes);
+        final result = await _export.exportMarkdown(
+          ref.read(notesProvider).allNotes,
+        );
         if (!mounted || result == null) return;
         _snack(result ? '✓ Markdown export saved' : 'Export failed — check logs');
 
@@ -256,7 +260,7 @@ class _DataMenuButtonState extends State<_DataMenuButton> {
           return;
         }
         if (notes.isEmpty) return; // user cancelled the file picker
-        await provider.importNotes(notes);
+        await notifier.importNotes(notes);
         if (!mounted) return;
         _snack('✓ Imported ${notes.length} notes');
     }

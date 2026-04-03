@@ -1,44 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
-import 'features/notes/models/note.dart';
 import 'features/notes/providers/notes_provider.dart';
 import 'features/notes/services/notes_service.dart';
 import 'features/notes/widgets/timeline_kanban_view.dart';
 
-class App extends StatefulWidget {
-  const App({
-    super.key,
-    required this.service,
-    required this.initialNotes,
-  });
-
-  final NotesService service;
-  final List<Note> initialNotes;
+/// Root widget. Wraps MaterialApp and observes app lifecycle for flush-saves.
+///
+/// [NotesService] and [initialNotes] are injected via [ProviderScope] overrides
+/// in [main], so this widget needs no constructor parameters.
+class App extends ConsumerStatefulWidget {
+  const App({super.key});
 
   @override
-  State<App> createState() => _AppState();
+  ConsumerState<App> createState() => _AppState();
 }
 
-class _AppState extends State<App> with WidgetsBindingObserver {
-  late final NotesProvider _provider;
+class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
+  // Cache the service so we can call dispose() after the provider scope tears
+  // down (ref may no longer be usable at that point).
+  late final NotesService _service;
 
   @override
   void initState() {
     super.initState();
-    _provider = NotesProvider(
-      service: widget.service,
-      initialNotes: widget.initialNotes,
-    );
+    _service = ref.read(notesServiceProvider);
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _provider.dispose();
-    widget.service.dispose(); // Close the SQLite connection.
+    _service.dispose();
     super.dispose();
   }
 
@@ -47,26 +41,23 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached) {
-      _provider.flushSave();
+      ref.read(notesProvider.notifier).flushSave();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<NotesProvider>.value(
-      value: _provider,
-      child: MaterialApp(
-        title: 'eNotes',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light().copyWith(
-          extensions: const [NoteColors.light],
-        ),
-        darkTheme: AppTheme.dark().copyWith(
-          extensions: const [NoteColors.dark],
-        ),
-        themeMode: ThemeMode.system,
-        home: const TimelineKanbanView(),
+    return MaterialApp(
+      title: 'eNotes',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light().copyWith(
+        extensions: const [NoteColors.light],
       ),
+      darkTheme: AppTheme.dark().copyWith(
+        extensions: const [NoteColors.dark],
+      ),
+      themeMode: ThemeMode.system,
+      home: const TimelineKanbanView(),
     );
   }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -21,7 +21,7 @@ import 'note_card.dart';
 /// Uses a [CustomScrollView] so the header sticks to the top while note cards
 /// scroll independently from all other columns. Note cards themselves have no
 /// internal scroll — they are always fully expanded to fit their content.
-class TimeColumn extends StatefulWidget {
+class TimeColumn extends ConsumerStatefulWidget {
   const TimeColumn({
     super.key,
     required this.data,
@@ -32,10 +32,10 @@ class TimeColumn extends StatefulWidget {
   final double availableHeight;
 
   @override
-  State<TimeColumn> createState() => _TimeColumnState();
+  ConsumerState<TimeColumn> createState() => _TimeColumnState();
 }
 
-class _TimeColumnState extends State<TimeColumn> {
+class _TimeColumnState extends ConsumerState<TimeColumn> {
   final _scrollController = ScrollController();
 
   @override
@@ -93,10 +93,13 @@ class _TimeColumnState extends State<TimeColumn> {
   }
 
   Widget _buildNoteList(BuildContext context) {
-    final provider = context.watch<NotesProvider>();
-    final col = provider.timeColumns.firstWhere(
-      (c) => c.bucketKey == widget.data.bucketKey,
-      orElse: () => widget.data,
+    final col = ref.watch(
+      notesProvider.select(
+        (s) => s.timeColumns.firstWhere(
+          (c) => c.bucketKey == widget.data.bucketKey,
+          orElse: () => widget.data,
+        ),
+      ),
     );
 
     return SliverList(
@@ -133,18 +136,16 @@ class _TimeColumnState extends State<TimeColumn> {
 /// - Responds to [NotesProvider.newNoteFocusRequest] changes (triggered by
 ///   Cmd+K) to grab keyboard focus and scroll the column back to the top.
 /// - Supports the same Markdown shortcuts as [NoteCard] (Cmd+B, Cmd+L, …).
-class _NewNoteComposer extends StatefulWidget {
+class _NewNoteComposer extends ConsumerStatefulWidget {
   const _NewNoteComposer({required this.scrollController});
 
-  /// The parent column's scroll controller, used to snap back to the top when
-  /// the composer receives focus via Cmd+K.
   final ScrollController scrollController;
 
   @override
-  State<_NewNoteComposer> createState() => _NewNoteComposerState();
+  ConsumerState<_NewNoteComposer> createState() => _NewNoteComposerState();
 }
 
-class _NewNoteComposerState extends State<_NewNoteComposer> {
+class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
   late final MarkdownController _controller;
   late final FocusNode _focusNode;
   bool _focused = false;
@@ -232,7 +233,7 @@ class _NewNoteComposerState extends State<_NewNoteComposer> {
   void _saveIfNeeded() {
     final content = _controller.text;
     if (content.trim().isEmpty) return;
-    context.read<NotesProvider>().addNote(content);
+    ref.read(notesProvider.notifier).addNote(content);
     // Reset composer so it is ready for the next note.
     _controller.value = TextEditingValue.empty;
   }
@@ -242,9 +243,7 @@ class _NewNoteComposerState extends State<_NewNoteComposer> {
   @override
   Widget build(BuildContext context) {
     // Detect when Cmd+K increments the focus counter and grab focus.
-    final req = context.select<NotesProvider, int>(
-      (p) => p.newNoteFocusRequest,
-    );
+    final req = ref.watch(notesProvider.select((s) => s.newNoteFocusRequest));
     if (req > 0 && req != _lastFocusRequest) {
       _lastFocusRequest = req;
       WidgetsBinding.instance.addPostFrameCallback((_) {

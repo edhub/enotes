@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -11,16 +11,16 @@ import '../providers/notes_provider.dart';
 /// Mirrors the structure of [TimeColumn]: a [CustomScrollView] with a sticky
 /// header and per-column independent scrolling. Note cards are read-only and
 /// offer "Restore" and "Delete Forever" actions.
-class TrashColumn extends StatefulWidget {
+class TrashColumn extends ConsumerStatefulWidget {
   const TrashColumn({super.key, required this.availableHeight});
 
   final double availableHeight;
 
   @override
-  State<TrashColumn> createState() => _TrashColumnState();
+  ConsumerState<TrashColumn> createState() => _TrashColumnState();
 }
 
-class _TrashColumnState extends State<TrashColumn> {
+class _TrashColumnState extends ConsumerState<TrashColumn> {
   final _scrollController = ScrollController();
 
   @override
@@ -31,13 +31,11 @@ class _TrashColumnState extends State<TrashColumn> {
 
   @override
   Widget build(BuildContext context) {
+    final notes = ref.watch(notesProvider.select((s) => s.trashedNotes));
     return SizedBox(
       width: LayoutConstants.trashColumnWidth,
       height: widget.availableHeight,
-      child: Consumer<NotesProvider>(
-        builder: (context, provider, _) {
-          final notes = provider.trashedNotes;
-          return CustomScrollView(
+      child: CustomScrollView(
             controller: _scrollController,
             slivers: [
               SliverPersistentHeader(
@@ -45,7 +43,7 @@ class _TrashColumnState extends State<TrashColumn> {
                 delegate: _TrashHeaderDelegate(
                   count: notes.length,
                   onEmptyTrash:
-                      notes.isEmpty ? null : provider.emptyTrash,
+                      notes.isEmpty ? null : ref.read(notesProvider.notifier).emptyTrash,
                 ),
               ),
               if (notes.isEmpty)
@@ -77,9 +75,7 @@ class _TrashColumnState extends State<TrashColumn> {
                   ),
                 ),
             ],
-          );
-        },
-      ),
+          ),
     );
   }
 }
@@ -210,24 +206,22 @@ class _EmptyTrashState extends StatelessWidget {
 
 /// A read-only card shown in the trash column.
 /// Provides "Restore" and "Delete Forever" actions, always visible.
-class TrashNoteCard extends StatefulWidget {
+class TrashNoteCard extends ConsumerStatefulWidget {
   const TrashNoteCard({super.key, required this.note});
 
   final Note note;
 
   @override
-  State<TrashNoteCard> createState() => _TrashNoteCardState();
+  ConsumerState<TrashNoteCard> createState() => _TrashNoteCardState();
 }
 
-class _TrashNoteCardState extends State<TrashNoteCard> {
+class _TrashNoteCardState extends ConsumerState<TrashNoteCard> {
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final nc = Theme.of(context).extension<NoteColors>();
-    final provider = context.read<NotesProvider>();
-
     final borderColor = nc?.cardBorder ?? Colors.grey.shade200;
     final bgColor = Theme.of(context).cardTheme.color;
 
@@ -275,7 +269,7 @@ class _TrashNoteCardState extends State<TrashNoteCard> {
                   icon: Icons.restore_rounded,
                   tooltip: 'Restore',
                   color: Theme.of(context).colorScheme.primary,
-                  onTap: () => provider.restoreNote(widget.note.id),
+                  onTap: () => ref.read(notesProvider.notifier).restoreNote(widget.note.id),
                 ),
                 const SizedBox(width: 2),
                 _TrashAction(
@@ -283,7 +277,7 @@ class _TrashNoteCardState extends State<TrashNoteCard> {
                   tooltip: 'Delete Forever',
                   color: Colors.red.shade400,
                   onTap: () =>
-                      provider.permanentlyDeleteNote(widget.note.id),
+                      ref.read(notesProvider.notifier).permanentlyDeleteNote(widget.note.id),
                 ),
               ],
             ),

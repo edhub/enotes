@@ -2,97 +2,145 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../models/note.dart';
 import '../models/time_group.dart';
 import '../services/notes_service.dart';
 
-/// Central state for all notes.
+// ── Infrastructure providers ──────────────────────────────────────────────────
+
+/// The SQLite-backed note service. Must be overridden in [ProviderScope]
+/// after [NotesService.init] completes in [main].
+final notesServiceProvider = Provider<NotesService>((ref) {
+  throw UnimplementedError(
+    'notesServiceProvider must be overridden in ProviderScope',
+  );
+});
+
+/// Notes loaded at startup before [runApp]. Overridden in [ProviderScope].
+final initialNotesProvider = Provider<List<Note>>((ref) {
+  throw UnimplementedError(
+    'initialNotesProvider must be overridden in ProviderScope',
+  );
+});
+
+// ── Domain provider ───────────────────────────────────────────────────────────
+
+/// Central provider for all note state and mutations.
 ///
-/// Responsibilities:
-///   - Owns the single [_notes] list (insertion order, newest at index 0)
-///   - Derives [draftNotes], [timeColumns], and [trashedNotes] as pure computed views
-///   - Draft notes: always exactly [LayoutConstants.maxDraftNotes] slots (permanent tabs)
-///   - Regular notes: soft-deleted into [trashedNotes]; restored or permanently removed
-///   - Schedules debounced persistence via [NotesService]
-class NotesProvider extends ChangeNotifier {
-  NotesProvider({
-    required NotesService service,
-    required List<Note> initialNotes,
-  })  : _service = service,
-        _notes = List<Note>.from(initialNotes) {
-    _ensureFiveDrafts();
-  }
+/// Future features (tags, tasks) create their own providers and `ref.watch`
+/// this one for cross-feature derived state — no [ProxyProvider] chains needed.
+final notesProvider = NotifierProvider<NotesNotifier, NotesState>(
+  NotesNotifier.new,
+);
 
-  final NotesService _service;
+// ── Immutable state ───────────────────────────────────────────────────────────
 
-  /// All notes in insertion order. Index 0 = most recently added.
-  final List<Note> _notes;
+/// All note state in a single immutable snapshot.
+///
+/// Computed views ([draftNotes], [timeColumns], [trashedNotes]) are pure
+/// functions of [notes] — no side effects, safe to call repeatedly.
+@immutable
+class NotesState {
+  const NotesState({
+    required this.notes,
+    this.activeDraftIndex = 0,
+    this.newNoteFocusRequest = 0,
+  });
 
-  int _activeDraftIndex = 0;
-  Timer? _saveTimer;
+  /// All notes in insertion order (index 0 = most recently added).
+  final List<Note> notes;
+
+  /// Index of the currently visible draft tab (0-based).
+  final int activeDraftIndex;
 
   /// Incremented each time the user requests focus on the new-note composer
-  /// (e.g. via Cmd+K). Widgets listen and request focus whenever this changes.
-  int _newNoteFocusRequest = 0;
-  int get newNoteFocusRequest => _newNoteFocusRequest;
-
-  /// Signals the Today column's new-note composer to take keyboard focus.
-  void requestNewNoteFocus() {
-    _newNoteFocusRequest++;
-    notifyListeners();
-  }
+  /// (e.g. via Cmd+K). Widgets detect the increment and grab keyboard focus.
+  final int newNoteFocusRequest;
 
   // ── Computed views ─────────────────────────────────────────────────────────
 
-  /// Exactly [LayoutConstants.maxDraftNotes] drafts, ordered by createdAt
-  /// ascending (oldest = tab 0, newest = last tab). Guaranteed non-empty.
-  List<Note> get draftNotes {
-    return _notes
-        .where((n) => n.isDraft && !n.isDeleted)
-        .toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-  }
+  /// Exactly [LayoutConstants.maxDraftNotes] drafts, oldest first (tab 0).
+  List<Note> get draftNotes => notes
+      .where((n) => n.isDraft && !n.isDeleted)
+      .toList()
+    ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-  /// Index of the currently visible draft card (0-based).
-  int get activeDraftIndex => _activeDraftIndex;
-
-  /// Non-draft, non-deleted notes grouped into time columns, sorted most-recent first.
-  /// Notes within each column preserve [_notes] insertion order (stable).
-  /// The 'today' bucket is always present even when empty, so the composer
-  /// that lives at the top of the Today column is always reachable.
+  /// Non-draft, non-deleted notes grouped into time columns, most-recent first.
+  /// The 'today' bucket is always present so the composer is always reachable.
   List<TimeColumnData> get timeColumns {
     final now = DateTime.now();
-    // Pre-seed today so the column is always rendered.
     final Map<String, List<Note>> buckets = {'today': []};
 
-    for (final note in _notes.where((n) => !n.isDraft && !n.isDeleted)) {
+    for (final note in notes.where((n) => !n.isDraft && !n.isDeleted)) {
       final key = TimeGroupHelper.bucketKey(note.createdAt, now: now);
       (buckets[key] ??= []).add(note);
     }
 
-    return buckets.entries.map((entry) {
-      return TimeColumnData(
-        bucketKey: entry.key,
-        group: TimeGroupHelper.groupFromKey(entry.key),
-        label: TimeGroupHelper.labelFromKey(entry.key),
-        notes: entry.value,
-        sortOrder: TimeGroupHelper.sortOrder(entry.key, now: now),
-      );
-    }).toList()
+    return buckets.entries
+        .map(
+          (entry) => TimeColumnData(
+            bucketKey: entry.key,
+            group: TimeGroupHelper.groupFromKey(entry.key),
+            label: TimeGroupHelper.labelFromKey(entry.key),
+            notes: entry.value,
+            sortOrder: TimeGroupHelper.sortOrder(entry.key, now: now),
+          ),
+        )
+        .toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
   }
 
-  /// All notes (for backup export). Includes drafts and soft-deleted.
-  List<Note> get allNotes => List<Note>.unmodifiable(_notes);
+  /// Soft-deleted notes sorted by deletion time, most recently deleted first.
+  List<Note> get trashedNotes => notes
+      .where((n) => n.isDeleted)
+      .toList()
+    ..sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
 
-  /// Soft-deleted notes, sorted by deletion time (most recently deleted first).
-  List<Note> get trashedNotes {
-    return _notes
-        .where((n) => n.isDeleted)
-        .toList()
-      ..sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
+  /// All notes unmodifiable (for export / backup).
+  List<Note> get allNotes => List<Note>.unmodifiable(notes);
+
+  // ── Copy helper ────────────────────────────────────────────────────────────
+
+  NotesState copyWith({
+    List<Note>? notes,
+    int? activeDraftIndex,
+    int? newNoteFocusRequest,
+  }) =>
+      NotesState(
+        notes: notes ?? this.notes,
+        activeDraftIndex: activeDraftIndex ?? this.activeDraftIndex,
+        newNoteFocusRequest: newNoteFocusRequest ?? this.newNoteFocusRequest,
+      );
+}
+
+// ── Notifier ──────────────────────────────────────────────────────────────────
+
+/// Business logic for all note mutations.
+///
+/// Accessed via `ref.read(notesProvider.notifier)`.
+class NotesNotifier extends Notifier<NotesState> {
+  Timer? _saveTimer;
+
+  @override
+  NotesState build() {
+    ref.onDispose(() => _saveTimer?.cancel());
+
+    final initialNotes = ref.read(initialNotesProvider);
+    return _ensureFiveDrafts(
+      NotesState(notes: List<Note>.from(initialNotes)),
+    );
+  }
+
+  // ── Focus ──────────────────────────────────────────────────────────────────
+
+  /// Signals the Today column's new-note composer to take keyboard focus.
+  void requestNewNoteFocus() {
+    state = state.copyWith(
+      newNoteFocusRequest: state.newNoteFocusRequest + 1,
+    );
   }
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -100,54 +148,60 @@ class NotesProvider extends ChangeNotifier {
   /// Adds a new regular (non-draft) note at the top of the list.
   void addNote(String content) {
     final note = Note.create(content: content, isDraft: false);
-    _notes.insert(0, note);
-    _commitAndNotify();
+    final updated = [note, ...state.notes];
+    state = state.copyWith(notes: updated);
+    _scheduleSave();
   }
 
   /// Updates note content in-place. Position in the list is preserved.
   void updateNote(String id, String content) {
-    final idx = _notes.indexWhere((n) => n.id == id);
+    final idx = state.notes.indexWhere((n) => n.id == id);
     if (idx == -1) return;
-    _notes[idx] = _notes[idx].copyWith(
+    final updated = List<Note>.from(state.notes);
+    updated[idx] = updated[idx].copyWith(
       content: content,
       updatedAt: DateTime.now().toUtc(),
     );
-    _commitAndNotify();
+    state = state.copyWith(notes: updated);
+    _scheduleSave();
   }
 
-  /// Soft-deletes a regular note (moves it to the trash).
-  /// Draft notes cannot be deleted.
+  /// Soft-deletes a regular note (moves to trash). Draft notes cannot be deleted.
   void deleteNote(String id) {
-    final idx = _notes.indexWhere((n) => n.id == id);
+    final idx = state.notes.indexWhere((n) => n.id == id);
     if (idx == -1) return;
-    if (_notes[idx].isDraft) {
-      log('NotesProvider: draft notes cannot be deleted');
+    if (state.notes[idx].isDraft) {
+      log('NotesNotifier: draft notes cannot be deleted');
       return;
     }
-    _notes[idx] = _notes[idx].copyWith(
-      deletedAt: DateTime.now().toUtc(),
-    );
-    _commitAndNotify();
+    final updated = List<Note>.from(state.notes);
+    updated[idx] = updated[idx].copyWith(deletedAt: DateTime.now().toUtc());
+    state = state.copyWith(notes: updated);
+    _scheduleSave();
   }
 
-  /// Restores a soft-deleted note back to its original column.
+  /// Restores a soft-deleted note back to its original time column.
   void restoreNote(String id) {
-    final idx = _notes.indexWhere((n) => n.id == id);
+    final idx = state.notes.indexWhere((n) => n.id == id);
     if (idx == -1) return;
-    _notes[idx] = _notes[idx].copyWith(clearDeletedAt: true);
-    _commitAndNotify();
+    final updated = List<Note>.from(state.notes);
+    updated[idx] = updated[idx].copyWith(clearDeletedAt: true);
+    state = state.copyWith(notes: updated);
+    _scheduleSave();
   }
 
   /// Permanently removes a single note from storage (trash only).
   void permanentlyDeleteNote(String id) {
-    _notes.removeWhere((n) => n.id == id);
-    _commitAndNotify();
+    final updated = state.notes.where((n) => n.id != id).toList();
+    state = state.copyWith(notes: updated);
+    _scheduleSave();
   }
 
   /// Permanently removes all soft-deleted notes.
   void emptyTrash() {
-    _notes.removeWhere((n) => n.isDeleted);
-    _commitAndNotify();
+    final updated = state.notes.where((n) => !n.isDeleted).toList();
+    state = state.copyWith(notes: updated);
+    _scheduleSave();
   }
 
   /// Replaces ALL notes with [notes] (full overwrite — used by import).
@@ -155,67 +209,66 @@ class NotesProvider extends ChangeNotifier {
   /// Draft slots are re-ensured after the replace. Saves to disk immediately
   /// (no debounce) so the caller can await completion.
   Future<void> importNotes(List<Note> notes) async {
-    _notes
-      ..clear()
-      ..addAll(notes);
-    // Re-ensure draft slots without the internal unawaited save.
-    final draftCount = _notes.where((n) => n.isDraft).length;
-    for (var i = draftCount; i < LayoutConstants.maxDraftNotes; i++) {
-      _notes.add(Note.create(content: '', isDraft: true));
-    }
-    _activeDraftIndex = 0;
     _saveTimer?.cancel();
     _saveTimer = null;
-    await _service.saveNotes(List<Note>.unmodifiable(_notes));
-    notifyListeners();
+
+    var newState = NotesState(notes: List<Note>.from(notes));
+    newState = _ensureFiveDrafts(newState);
+    state = newState;
+
+    await ref
+        .read(notesServiceProvider)
+        .saveNotes(List<Note>.unmodifiable(state.notes));
   }
 
-  /// Switches the visible draft card. Clamps to valid range automatically.
+  /// Switches the visible draft tab. Clamps to valid range automatically.
   void setActiveDraftIndex(int index) {
-    final drafts = draftNotes;
+    final drafts = state.draftNotes;
     if (drafts.isEmpty) return;
     final clamped = index.clamp(0, drafts.length - 1);
-    if (_activeDraftIndex == clamped) return;
-    _activeDraftIndex = clamped;
-    notifyListeners();
+    if (state.activeDraftIndex == clamped) return;
+    state = state.copyWith(activeDraftIndex: clamped);
   }
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
-
-  /// Cancels the debounce timer and writes immediately.
+  /// Cancels the debounce timer and writes to disk immediately.
+  /// Call from app lifecycle hooks (inactive / detached).
   void flushSave() {
     _saveTimer?.cancel();
     _saveTimer = null;
-    _service.saveNotes(List<Note>.unmodifiable(_notes));
-  }
-
-  @override
-  void dispose() {
-    _saveTimer?.cancel();
-    super.dispose();
+    ref
+        .read(notesServiceProvider)
+        .saveNotes(List<Note>.unmodifiable(state.notes));
   }
 
   // ── Private ────────────────────────────────────────────────────────────────
 
   /// Ensures exactly [LayoutConstants.maxDraftNotes] draft slots exist.
-  /// Called once in the constructor. If new drafts are added, saves immediately.
-  void _ensureFiveDrafts() {
-    final existing = _notes.where((n) => n.isDraft).length;
-    if (existing >= LayoutConstants.maxDraftNotes) return;
+  /// If new drafts are created, saves to disk immediately.
+  NotesState _ensureFiveDrafts(NotesState s) {
+    final existing = s.notes.where((n) => n.isDraft).length;
+    if (existing >= LayoutConstants.maxDraftNotes) return s;
+
+    final updated = List<Note>.from(s.notes);
     for (int i = existing; i < LayoutConstants.maxDraftNotes; i++) {
-      _notes.add(Note.create(content: '', isDraft: true));
+      updated.add(Note.create(content: '', isDraft: true));
     }
-    // Persist the newly created slots without waiting for debounce.
-    unawaited(_service.saveNotes(List<Note>.unmodifiable(_notes)));
+    // Save the newly created slots without waiting for the debounce timer.
+    unawaited(
+      ref
+          .read(notesServiceProvider)
+          .saveNotes(List<Note>.unmodifiable(updated)),
+    );
+    return s.copyWith(notes: updated);
   }
 
-  /// Notifies listeners and schedules a debounced (800 ms) save.
-  void _commitAndNotify() {
-    notifyListeners();
+  /// Schedules a debounced (800 ms) save to disk.
+  void _scheduleSave() {
     _saveTimer?.cancel();
     _saveTimer = Timer(
       const Duration(milliseconds: 800),
-      () => _service.saveNotes(List<Note>.unmodifiable(_notes)),
+      () => ref
+          .read(notesServiceProvider)
+          .saveNotes(List<Note>.unmodifiable(state.notes)),
     );
   }
 }

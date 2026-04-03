@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../../editor/controllers/markdown_controller.dart';
@@ -18,7 +18,7 @@ import '../providers/notes_provider.dart';
 /// - No timestamp is shown in the header by default.
 /// - On hover/focus a ⋯ button appears; tapping it opens a popover with
 ///   timestamps and (for non-draft cards) a "Move to Trash" action.
-class NoteCard extends StatefulWidget {
+class NoteCard extends ConsumerStatefulWidget {
   const NoteCard({
     super.key,
     required this.note,
@@ -35,10 +35,10 @@ class NoteCard extends StatefulWidget {
   final int? minLines;
 
   @override
-  State<NoteCard> createState() => _NoteCardState();
+  ConsumerState<NoteCard> createState() => _NoteCardState();
 }
 
-class _NoteCardState extends State<NoteCard> {
+class _NoteCardState extends ConsumerState<NoteCard> {
   late final MarkdownController _controller;
   late final FocusNode _focusNode;
   Timer? _saveTimer;
@@ -165,7 +165,7 @@ class _NoteCardState extends State<NoteCard> {
     _saveTimer = null;
     final content = _controller.text;
     if (content != widget.note.content) {
-      context.read<NotesProvider>().updateNote(widget.note.id, content);
+      ref.read(notesProvider.notifier).updateNote(widget.note.id, content);
     }
   }
 
@@ -547,17 +547,17 @@ class _TimeRow extends StatelessWidget {
   }
 }
 
-class _DeleteRow extends StatefulWidget {
+class _DeleteRow extends ConsumerStatefulWidget {
   const _DeleteRow({required this.note, required this.onClose});
 
   final Note note;
   final VoidCallback onClose;
 
   @override
-  State<_DeleteRow> createState() => _DeleteRowState();
+  ConsumerState<_DeleteRow> createState() => _DeleteRowState();
 }
 
-class _DeleteRowState extends State<_DeleteRow> {
+class _DeleteRowState extends ConsumerState<_DeleteRow> {
   bool _hovered = false;
 
   @override
@@ -570,7 +570,7 @@ class _DeleteRowState extends State<_DeleteRow> {
       child: GestureDetector(
         onTap: () {
           widget.onClose();
-          context.read<NotesProvider>().deleteNote(widget.note.id);
+          ref.read(notesProvider.notifier).deleteNote(widget.note.id);
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),

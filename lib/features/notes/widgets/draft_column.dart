@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
@@ -9,7 +9,7 @@ import 'note_card.dart';
 /// The left-most column. Five permanent draft tabs at the top, Chrome-style:
 /// the active tab has no bottom border and merges visually with the content
 /// area below it. Tab labels are fixed numbers 1–5.
-class DraftColumn extends StatelessWidget {
+class DraftColumn extends ConsumerWidget {
   const DraftColumn({super.key, required this.availableHeight});
 
   final double availableHeight;
@@ -20,59 +20,52 @@ class DraftColumn extends StatelessWidget {
       availableHeight - _tabBarHeight - LayoutConstants.pageVPad * 2;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final nc = Theme.of(context).extension<NoteColors>();
-    // Active tab background = content area background → seamless merge.
     final draftBg =
         nc?.draftCardBackground ?? Theme.of(context).cardTheme.color!;
     final borderColor = nc?.cardBorder ?? const Color(0xFFE2E8F0);
 
+    final drafts = ref.watch(notesProvider.select((s) => s.draftNotes));
+    final safeIndex = ref
+        .watch(notesProvider.select((s) => s.activeDraftIndex))
+        .clamp(0, drafts.length - 1);
+
     return SizedBox(
       width: LayoutConstants.draftColumnWidth,
       height: availableHeight,
-      child: Consumer<NotesProvider>(
-        builder: (context, provider, _) {
-          final drafts = provider.draftNotes;
-          final safeIndex = provider.activeDraftIndex.clamp(
-            0,
-            drafts.length - 1,
-          );
-
-          return Column(
-            children: [
-              _ChromeTabBar(
-                count: drafts.length,
-                activeIndex: safeIndex,
-                activeBg: draftBg,
-                borderColor: borderColor,
-              ),
-              // Same background as active tab — no visible seam.
-              Expanded(
-                child: ColoredBox(
-                  color: draftBg,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: LayoutConstants.pageVPad,
-                    ),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      transitionBuilder: (child, anim) =>
-                          FadeTransition(opacity: anim, child: child),
-                      child: NoteCard(
-                        key: ValueKey(drafts[safeIndex].id),
-                        note: drafts[safeIndex],
-                        isDraftView: true,
-                        columnWidth: LayoutConstants.draftColumnWidth,
-                        minHeight: _cardHeight,
-                        minLines: 30,
-                      ),
-                    ),
+      child: Column(
+        children: [
+          _ChromeTabBar(
+            count: drafts.length,
+            activeIndex: safeIndex,
+            activeBg: draftBg,
+            borderColor: borderColor,
+          ),
+          Expanded(
+            child: ColoredBox(
+              color: draftBg,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: LayoutConstants.pageVPad,
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (child, anim) =>
+                      FadeTransition(opacity: anim, child: child),
+                  child: NoteCard(
+                    key: ValueKey(drafts[safeIndex].id),
+                    note: drafts[safeIndex],
+                    isDraftView: true,
+                    columnWidth: LayoutConstants.draftColumnWidth,
+                    minHeight: _cardHeight,
+                    minLines: 30,
                   ),
                 ),
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -80,7 +73,7 @@ class DraftColumn extends StatelessWidget {
 
 // ── Chrome-style tab bar ──────────────────────────────────────────────────────
 
-class _ChromeTabBar extends StatelessWidget {
+class _ChromeTabBar extends ConsumerWidget {
   const _ChromeTabBar({
     required this.count,
     required this.activeIndex,
@@ -94,7 +87,7 @@ class _ChromeTabBar extends StatelessWidget {
   final Color borderColor;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -127,7 +120,7 @@ class _ChromeTabBar extends StatelessWidget {
                 borderColor: borderColor,
                 inactiveBg: inactiveBg,
                 onTap: () =>
-                    context.read<NotesProvider>().setActiveDraftIndex(i),
+                    ref.read(notesProvider.notifier).setActiveDraftIndex(i),
               ),
             ),
           );
