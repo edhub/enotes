@@ -40,18 +40,51 @@ final notesProvider = NotifierProvider<NotesNotifier, NotesState>(
 
 /// All note state in a single immutable snapshot.
 ///
-/// Computed views ([draftNotes], [timeColumns], [trashedNotes]) are pure
-/// functions of [notes] — no side effects, safe to call repeatedly.
+/// [draftNotes], [timeColumns], [trashedNotes] are precomputed at construction
+/// time and stored as final fields. [copyWith] reuses the same list references
+/// when [notes] is unchanged, so Riverpod's [select] can correctly detect
+/// "nothing changed" via reference equality and skip widget rebuilds.
 @immutable
 class NotesState {
-  const NotesState({
-    required this.notes,
-    this.activeDraftIndex = 0,
-    this.newNoteFocusRequest = 0,
-  });
+  /// Public constructor: derives [draftNotes], [timeColumns], [trashedNotes]
+  /// from [notes] immediately.
+  NotesState({
+    required List<Note> notes,
+    int activeDraftIndex = 0,
+    int newNoteFocusRequest = 0,
+  }) : this._(
+          notes: notes,
+          draftNotes: _computeDraftNotes(notes),
+          timeColumns: _computeTimeColumns(notes),
+          trashedNotes: _computeTrashedNotes(notes),
+          activeDraftIndex: activeDraftIndex,
+          newNoteFocusRequest: newNoteFocusRequest,
+        );
+
+  /// Internal constructor: all fields supplied directly.
+  /// Used by [copyWith] to preserve list references when [notes] is unchanged.
+  const NotesState._(
+      {required this.notes,
+      required this.draftNotes,
+      required this.timeColumns,
+      required this.trashedNotes,
+      required this.activeDraftIndex,
+      required this.newNoteFocusRequest});
 
   /// All notes in insertion order (index 0 = most recently added).
   final List<Note> notes;
+
+  /// Exactly [LayoutConstants.maxDraftNotes] drafts, oldest first (tab 0).
+  /// Stable reference: rebuilt only when [notes] changes.
+  final List<Note> draftNotes;
+
+  /// Non-draft, non-deleted notes in time columns, most-recent first.
+  /// Stable reference: rebuilt only when [notes] changes.
+  final List<TimeColumnData> timeColumns;
+
+  /// Soft-deleted notes, most recently deleted first.
+  /// Stable reference: rebuilt only when [notes] changes.
+  final List<Note> trashedNotes;
 
   /// Index of the currently visible draft tab (0-based).
   final int activeDraftIndex;
@@ -60,25 +93,54 @@ class NotesState {
   /// (e.g. via Cmd+K). Widgets detect the increment and grab keyboard focus.
   final int newNoteFocusRequest;
 
-  // ── Computed views ─────────────────────────────────────────────────────────
+  /// All notes unmodifiable (for export / backup).
+  List<Note> get allNotes => List<Note>.unmodifiable(notes);
 
-  /// Exactly [LayoutConstants.maxDraftNotes] drafts, oldest first (tab 0).
-  List<Note> get draftNotes => notes
-      .where((n) => n.isDraft && !n.isDeleted)
-      .toList()
-    ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  // ── Copy helper ────────────────────────────────────────────────────────────
 
-  /// Non-draft, non-deleted notes grouped into time columns, most-recent first.
-  /// The 'today' bucket is always present so the composer is always reachable.
-  List<TimeColumnData> get timeColumns {
+  /// When [notes] is omitted, derived list fields keep their current
+  /// references — [select] sees no change and skips widget rebuilds.
+  /// When [notes] is provided, all three derived lists are recomputed.
+  NotesState copyWith({
+    List<Note>? notes,
+    int? activeDraftIndex,
+    int? newNoteFocusRequest,
+  }) {
+    if (notes == null) {
+      // Only scalar fields changed — reuse existing list references.
+      return NotesState._(
+        notes: this.notes,
+        draftNotes: draftNotes,
+        timeColumns: timeColumns,
+        trashedNotes: trashedNotes,
+        activeDraftIndex: activeDraftIndex ?? this.activeDraftIndex,
+        newNoteFocusRequest: newNoteFocusRequest ?? this.newNoteFocusRequest,
+      );
+    }
+    // notes changed — recompute all derived views.
+    return NotesState._(
+      notes: notes,
+      draftNotes: _computeDraftNotes(notes),
+      timeColumns: _computeTimeColumns(notes),
+      trashedNotes: _computeTrashedNotes(notes),
+      activeDraftIndex: activeDraftIndex ?? this.activeDraftIndex,
+      newNoteFocusRequest: newNoteFocusRequest ?? this.newNoteFocusRequest,
+    );
+  }
+
+  // ── Static computation helpers ─────────────────────────────────────────────
+
+  static List<Note> _computeDraftNotes(List<Note> notes) =>
+      notes.where((n) => n.isDraft && !n.isDeleted).toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+  static List<TimeColumnData> _computeTimeColumns(List<Note> notes) {
     final now = DateTime.now();
     final Map<String, List<Note>> buckets = {'today': []};
-
     for (final note in notes.where((n) => !n.isDraft && !n.isDeleted)) {
       final key = TimeGroupHelper.bucketKey(note.createdAt, now: now);
       (buckets[key] ??= []).add(note);
     }
-
     return buckets.entries
         .map(
           (entry) => TimeColumnData(
@@ -93,27 +155,9 @@ class NotesState {
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
   }
 
-  /// Soft-deleted notes sorted by deletion time, most recently deleted first.
-  List<Note> get trashedNotes => notes
-      .where((n) => n.isDeleted)
-      .toList()
-    ..sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
-
-  /// All notes unmodifiable (for export / backup).
-  List<Note> get allNotes => List<Note>.unmodifiable(notes);
-
-  // ── Copy helper ────────────────────────────────────────────────────────────
-
-  NotesState copyWith({
-    List<Note>? notes,
-    int? activeDraftIndex,
-    int? newNoteFocusRequest,
-  }) =>
-      NotesState(
-        notes: notes ?? this.notes,
-        activeDraftIndex: activeDraftIndex ?? this.activeDraftIndex,
-        newNoteFocusRequest: newNoteFocusRequest ?? this.newNoteFocusRequest,
-      );
+  static List<Note> _computeTrashedNotes(List<Note> notes) =>
+      notes.where((n) => n.isDeleted).toList()
+        ..sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
 }
 
 // ── Notifier ──────────────────────────────────────────────────────────────────

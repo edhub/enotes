@@ -187,35 +187,61 @@ NotesState build() {
 
 ## 不可变状态（`NotesState`）
 
-所有状态字段 `final`，变更通过 `copyWith` 产生新实例：
+所有状态字段 `final`，变更通过 `copyWith` 产生新实例。
+
+### 派生视图的稳定引用
+
+`draftNotes`、`timeColumns`、`trashedNotes` 是 `final` 字段，而非 getter。
+构造时通过静态 helper 一次性计算，`copyWith` 在 `notes` 不变时复用旧引用：
 
 ```dart
 @immutable
 class NotesState {
-  const NotesState({
-    required this.notes,
-    this.activeDraftIndex = 0,
-    this.newNoteFocusRequest = 0,
-  });
+  // 公共构造器：立即计算三个派生视图
+  NotesState({required List<Note> notes, ...})
+      : this._(notes: notes,
+               draftNotes: _computeDraftNotes(notes),
+               timeColumns: _computeTimeColumns(notes),
+               trashedNotes: _computeTrashedNotes(notes),
+               ...);
+
+  // 内部构造器：所有字段直接赋值（copyWith 用）
+  const NotesState._({required this.notes,
+                      required this.draftNotes, ...});
 
   final List<Note> notes;
+  final List<Note> draftNotes;          // 稳定引用
+  final List<TimeColumnData> timeColumns; // 稳定引用
+  final List<Note> trashedNotes;        // 稳定引用
   final int activeDraftIndex;
   final int newNoteFocusRequest;
 
-  // 计算属性：纯函数，每次访问重新计算（无缓存）
-  List<Note> get draftNotes   => notes.where(...).toList()..sort(...);
-  List<Note> get trashedNotes => notes.where(...).toList()..sort(...);
-  List<TimeColumnData> get timeColumns => ...;
-  List<Note> get allNotes     => List<Note>.unmodifiable(notes);
-
-  NotesState copyWith({List<Note>? notes, int? activeDraftIndex, int? newNoteFocusRequest}) =>
-      NotesState(
-        notes: notes ?? this.notes,
-        activeDraftIndex: activeDraftIndex ?? this.activeDraftIndex,
-        newNoteFocusRequest: newNoteFocusRequest ?? this.newNoteFocusRequest,
-      );
+  NotesState copyWith({List<Note>? notes, int? activeDraftIndex, ...}) {
+    if (notes == null) {
+      // notes 未变：三个派生列表保持原引用 → select() 比较相等 → 跳过重建
+      return NotesState._(notes: this.notes,
+                          draftNotes: draftNotes,   // ← 同一引用
+                          timeColumns: timeColumns, // ← 同一引用
+                          trashedNotes: trashedNotes,
+                          ...);
+    }
+    // notes 变了：重新计算所有派生视图
+    return NotesState._(notes: notes,
+                        draftNotes: _computeDraftNotes(notes),
+                        ...);
+  }
 }
 ```
+
+### 实际效果
+
+| 操作 | notes 变？ | 派生列表引用 | 受影响 widget |
+|---|---|---|---|
+| `addNote` / `deleteNote` | ✅ | 新实例 | 所有订阅者重建 |
+| `setActiveDraftIndex` | ❌ | **复用** | 只有订阅 `activeDraftIndex` 的重建 |
+| `requestNewNoteFocus` | ❌ | **复用** | 只有订阅 `newNoteFocusRequest` 的重建 |
+
+> ⚠️ 当 `notes` 变化时（如 `addNote`），三个派生列表全部重算，即使部分内容未变（例如新增普通笔记不影响 `trashedNotes`）。这是合理的简化：修复这个需要深比较，目前笔记量级不值得。
 
 ---
 
