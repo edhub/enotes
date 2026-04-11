@@ -11,6 +11,7 @@ import '../../editor/widgets/markdown_editor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/note.dart';
 import '../providers/notes_provider.dart';
+import '../providers/search_provider.dart';
 
 /// A note card with fully inline editing via [MarkdownEditor].
 ///
@@ -177,6 +178,17 @@ class _NoteCardState extends ConsumerState<NoteCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Sync search tokens into the controller so buildTextSpan highlights them.
+    final rawQuery =
+        ref.watch(searchQueryProvider.select((s) => s.query)).trim();
+    _controller.searchTokens = rawQuery.isEmpty
+        ? const []
+        : rawQuery
+              .toLowerCase()
+              .split(RegExp(r'\s+'))
+              .where((t) => t.isNotEmpty)
+              .toList();
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final nc = Theme.of(context).extension<NoteColors>();
 

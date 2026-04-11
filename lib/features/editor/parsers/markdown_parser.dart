@@ -10,7 +10,7 @@ class _Colors {
   final Color codeText;
   final Color codeBg;
   final Color punct; // subtle markdown punctuation (---, list bullet…)
-  final Color highlightBg;
+  final Color searchHighlightBg;
 
   const _Colors({
     required this.heading,
@@ -20,7 +20,7 @@ class _Colors {
     required this.codeText,
     required this.codeBg,
     required this.punct,
-    required this.highlightBg,
+    required this.searchHighlightBg,
   });
 
   static const dark = _Colors(
@@ -31,7 +31,7 @@ class _Colors {
     codeText: Color(0xFFABB2BF),
     codeBg: Color(0xFF2C313A),
     punct: Color(0xFF5C6370),
-    highlightBg: Color(0xFF4B4000),
+    searchHighlightBg: Color(0xFF4B4000),
   );
 
   static const light = _Colors(
@@ -42,7 +42,7 @@ class _Colors {
     codeText: Color(0xFF47494E),
     codeBg: Color(0xFFF3F3F3),
     punct: Color(0xFFD1D1D1),
-    highlightBg: Color(0xFFFFF5B1),
+    searchHighlightBg: Color(0xFFFFF5B1),
   );
 }
 
@@ -60,7 +60,7 @@ class _Colors {
 /// - Ordered lists `1.`
 /// - Horizontal rules `---`
 /// - Inline: bold (`*`/`**`/`***`/`_`/`__`),
-///   strikethrough (`~~`), highlight (`==`), inline code (`` ` ``),
+///   strikethrough (`~~`), inline code (`` ` ``),
 ///   links `[text](url)`
 ///   Note: single `*`/`_` also render as bold — no separate italic style.
 class MarkdownParser {
@@ -71,14 +71,29 @@ class MarkdownParser {
   static const _headingSizes = [15.0, 15.0, 15.0, 14.0, 14.0, 14.0];
 
   /// Build a [TextSpan] tree from [text].
+  ///
+  /// If [searchTokens] is non-empty, every case-insensitive occurrence of each
+  /// token is highlighted with [_Colors.searchHighlightBg] as a post-process
+  /// over the Markdown-styled tree.
   static TextSpan buildSpan({
     required String text,
     required TextStyle baseStyle,
     required bool isDark,
+    List<String> searchTokens = const [],
   }) {
     if (text.isEmpty) return TextSpan(text: '', style: baseStyle);
     final c = isDark ? _Colors.dark : _Colors.light;
-    return _buildLines(text, baseStyle, c);
+    final span = _buildLines(text, baseStyle, c);
+    if (searchTokens.isEmpty) return span;
+    final patterns = searchTokens
+        .map((t) => RegExp(RegExp.escape(t), caseSensitive: false))
+        .toList();
+    // Root span is always a TextSpan produced by _buildLines; recurse only
+    // into its children so the return type is guaranteed without a cast.
+    final newChildren = span.children
+        ?.map((child) => _highlightSearch(child, patterns, c.searchHighlightBg))
+        .toList();
+    return TextSpan(style: span.style, children: newChildren);
   }
 
   // ── Line-level ─────────────────────────────────────────────────────────────
@@ -281,14 +296,6 @@ class MarkdownParser {
         ),
       ),
     ),
-    // Highlight  ==text==
-    _Pattern(
-      RegExp(r'==(?!\s)([^=\n]+)(?<!\s)=='),
-      (m, base, c) => TextSpan(
-        text: m.group(0),
-        style: base.copyWith(backgroundColor: c.highlightBg),
-      ),
-    ),
     // Link  [text](url)
     _Pattern(
       RegExp(r'\[([^\]\n]+)\]\([^)\n]+\)'),
@@ -302,6 +309,87 @@ class MarkdownParser {
       ),
     ),
   ];
+
+  // ── Search highlight post-processing ──────────────────────────────────────
+
+  /// Recursively walks the [InlineSpan] tree, splitting every leaf
+  /// [TextSpan] so that all occurrences of [patterns] gain [bg] as their
+  /// background colour.  Non-[TextSpan] nodes (e.g. [WidgetSpan]) pass
+  /// through unchanged.
+  static InlineSpan _highlightSearch(
+    InlineSpan span,
+    List<RegExp> patterns,
+    Color bg,
+  ) {
+    if (span is! TextSpan) return span;
+
+    // Leaf node: has raw text, no children.
+    final text = span.text;
+    if (text != null &&
+        text.isNotEmpty &&
+        (span.children == null || span.children!.isEmpty)) {
+      return _splitHighlight(text, span.style, patterns, bg);
+    }
+
+    // Internal node: recurse into children.
+    final newChildren =
+        span.children?.map((c) => _highlightSearch(c, patterns, bg)).toList();
+    return TextSpan(
+      text: span.text,
+      style: span.style,
+      children: newChildren,
+    );
+  }
+
+  /// Splits a plain-text leaf [TextSpan] at all match positions of [patterns],
+  /// wrapping matched substrings with [bg] as their background colour.
+  static InlineSpan _splitHighlight(
+    String text,
+    TextStyle? style,
+    List<RegExp> patterns,
+    Color bg,
+  ) {
+    // Collect all match ranges.
+    final ranges = <(int, int)>[];
+    for (final re in patterns) {
+      for (final m in re.allMatches(text)) {
+        if (m.start < m.end) ranges.add((m.start, m.end));
+      }
+    }
+    if (ranges.isEmpty) return TextSpan(text: text, style: style);
+
+    // Sort by start, then merge overlapping/adjacent ranges.
+    ranges.sort((a, b) => a.$1.compareTo(b.$1));
+    final merged = <(int, int)>[];
+    for (final r in ranges) {
+      if (merged.isEmpty || r.$1 >= merged.last.$2) {
+        merged.add(r);
+      } else {
+        final last = merged.removeLast();
+        merged.add((last.$1, r.$2 > last.$2 ? r.$2 : last.$2));
+      }
+    }
+
+    // Build child spans, preserving the original style on non-match segments.
+    final children = <InlineSpan>[];
+    var pos = 0;
+    for (final (start, end) in merged) {
+      if (start > pos) {
+        children.add(TextSpan(text: text.substring(pos, start), style: style));
+      }
+      children.add(TextSpan(
+        text: text.substring(start, end),
+        style: (style ?? const TextStyle()).copyWith(backgroundColor: bg),
+      ));
+      pos = end;
+    }
+    if (pos < text.length) {
+      children.add(TextSpan(text: text.substring(pos), style: style));
+    }
+
+    if (children.length == 1) return children.first;
+    return TextSpan(style: style, children: children);
+  }
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────

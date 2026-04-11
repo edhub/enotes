@@ -16,7 +16,26 @@ class MarkdownController extends TextEditingController {
   // set by MarkdownEditor and never changes at runtime.
   String? _cachedText;
   bool? _cachedDark;
+  List<String> _cachedTokens = const [];
   TextSpan? _cachedSpan;
+
+  /// Search tokens to highlight. Setting a new value clears the parse cache.
+  /// Does **not** call [notifyListeners] — callers that update this during
+  /// their own build (e.g. [NoteCard]) rely on the enclosing rebuild to
+  /// redraw the [TextField].
+  set searchTokens(List<String> tokens) {
+    if (_tokensEqual(tokens, _cachedTokens)) return;
+    _cachedTokens = tokens;
+    _cachedSpan = null;
+  }
+
+  static bool _tokensEqual(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   @override
   TextSpan buildTextSpan({
@@ -36,6 +55,7 @@ class MarkdownController extends TextEditingController {
         text: text,
         baseStyle: base,
         isDark: isDark,
+        searchTokens: _cachedTokens,
       );
       _cachedText = text;
       _cachedDark = isDark;
@@ -47,6 +67,11 @@ class MarkdownController extends TextEditingController {
     // composing boundary.  Splitting would break markdown constructs that cross
     // it (e.g. "**bo[ld]**" where [] is the composing region).  The platform
     // IME commits text correctly without an explicit underline span.
-    return MarkdownParser.buildSpan(text: text, baseStyle: base, isDark: isDark);
+    return MarkdownParser.buildSpan(
+      text: text,
+      baseStyle: base,
+      isDark: isDark,
+      searchTokens: _cachedTokens,
+    );
   }
 }
