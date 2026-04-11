@@ -2,22 +2,22 @@
 /// Never scatter magic numbers across widget files.
 abstract final class LayoutConstants {
   // Column widths
-  static const double draftColumnWidth = 600;
-  static const double timeColumnWidth = 450;
-  static const double trashColumnWidth = 400;
+  static const double draftColumnWidth = 450;
+  static const double timeColumnWidth = 380;
+  static const double trashColumnWidth = 380;
 
   // Spacing
-  static const double columnGap = 20;
-  static const double pageHPad = 24;
+  static const double columnGap = 8;
+  static const double pageHPad = 4;
   static const double pageVPad = 16;
 
   // Column header
   static const double columnHeaderHeight = 56;
 
   // Cards
-  static const double cardPadding = 16;
+  static const double cardPadding = 12;
   static const double cardBorderRadius = 12;
-  static const double cardMarginBottom = 12;
+  static const double cardMarginBottom = 16;
 
   /// Number of permanent draft slots (always present, like tabs).
   static const int maxDraftNotes = 5;

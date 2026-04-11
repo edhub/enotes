@@ -9,6 +9,7 @@ import '../../editor/services/markdown_shortcuts.dart';
 import '../../editor/widgets/markdown_editor.dart';
 import '../models/time_group.dart';
 import '../providers/notes_provider.dart';
+import '../providers/search_provider.dart';
 import 'column_header.dart';
 import 'note_card.dart';
 
@@ -94,8 +95,8 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
 
   Widget _buildNoteList(BuildContext context) {
     final col = ref.watch(
-      notesProvider.select(
-        (s) => s.timeColumns.firstWhere(
+      filteredTimeColumnsProvider.select(
+        (cols) => cols.firstWhere(
           (c) => c.bucketKey == widget.data.bucketKey,
           orElse: () => widget.data,
         ),

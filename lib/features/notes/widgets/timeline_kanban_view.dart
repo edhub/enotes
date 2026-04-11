@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../providers/notes_provider.dart';
+import '../providers/search_provider.dart';
 import '../services/export_service.dart';
 import 'draft_column.dart';
 import 'time_column.dart';
@@ -54,19 +55,31 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
   /// only when the shortcut matches, so all other keys pass through normally.
   bool _handleGlobalKey(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
-    final isMetaK =
-        event.logicalKey == LogicalKeyboardKey.keyK &&
-        HardwareKeyboard.instance.isMetaPressed;
-    if (!isMetaK) return false;
+    if (!HardwareKeyboard.instance.isMetaPressed) return false;
 
-    _hScroll.animateTo(
-      0,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOut,
-    );
-    // Use the BuildContext safely — the widget is still mounted at this point.
-    ref.read(notesProvider.notifier).requestNewNoteFocus();
-    return true; // consumed
+    // Cmd+K → focus the new-note composer in the Today column.
+    if (event.logicalKey == LogicalKeyboardKey.keyK) {
+      _hScroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+      ref.read(notesProvider.notifier).requestNewNoteFocus();
+      return true;
+    }
+
+    // Cmd+F → focus the search bar in the Draft column.
+    if (event.logicalKey == LogicalKeyboardKey.keyF) {
+      _hScroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+      ref.read(searchQueryProvider.notifier).requestFocus();
+      return true;
+    }
+
+    return false;
   }
 
   void _onHScroll() {
@@ -131,7 +144,7 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
   }
 
   Widget _buildRow(BuildContext context, double availH) {
-    final columns = ref.watch(notesProvider.select((s) => s.timeColumns));
+    final columns = ref.watch(filteredTimeColumnsProvider);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

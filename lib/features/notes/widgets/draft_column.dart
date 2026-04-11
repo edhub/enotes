@@ -5,6 +5,7 @@ import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/notes_provider.dart';
 import 'note_card.dart';
+import 'note_search_bar.dart';
 
 /// The left-most column. Five permanent draft tabs at the top, Chrome-style:
 /// the active tab has no bottom border and merges visually with the content
@@ -17,7 +18,10 @@ class DraftColumn extends ConsumerWidget {
   static const _tabBarHeight = 44.0;
 
   double get _cardHeight =>
-      availableHeight - _tabBarHeight - LayoutConstants.pageVPad * 2;
+      availableHeight -
+      _tabBarHeight -
+      NoteSearchBar.totalHeight -
+      LayoutConstants.pageVPad * 2;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,6 +40,7 @@ class DraftColumn extends ConsumerWidget {
       height: availableHeight,
       child: Column(
         children: [
+          const NoteSearchBar(),
           _ChromeTabBar(
             count: drafts.length,
             activeIndex: safeIndex,
