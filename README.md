@@ -12,12 +12,14 @@ space with 5 persistent tabs.
 Key features:
 
 - **Inline editing** — click any note to start typing. No dialogs, no modals.
-- **Markdown syntax highlighting** via `re_editor`
+- **Markdown syntax highlighting** — fully custom editor, zero third-party dependencies
 - **Timeline columns** — notes are placed by creation date; editing never moves them
 - **Draft tabs** — 5 Chrome-style persistent draft slots
+- **Full-text search** — Cmd+F to filter notes across all columns with highlighted matches
 - **Soft-delete / Trash** — deleted notes move to a Trash column; restore or
   permanently remove from there
-- **Auto-save** — debounced 800 ms write, with an immediate flush on app close
+- **Auto-save** — debounced 800 ms incremental write, with an immediate flush on app close
+- **Import / Export** — JSON full backup and Markdown plain-text export
 - **Dark / Light mode** — follows macOS system preference
 
 ## Platform
@@ -42,8 +44,11 @@ just run      # open /Applications/enotes.app
 
 ## Data storage
 
-Notes are persisted as JSON at:
+Notes are persisted in SQLite (WAL mode) at:
 
 ```
-~/Documents/enotes/notes.json
+~/Library/Application Support/com.example.enotes/enotes.db       # Release
+~/Library/Application Support/com.example.enotes/enotes_dev.db   # Debug
 ```
+
+A one-time migration from the legacy JSON format runs automatically on first launch.

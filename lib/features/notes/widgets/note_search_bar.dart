@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../providers/search_provider.dart';
 
 /// Compact search bar placed at the top of the Draft column.
@@ -62,7 +63,6 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final state = ref.watch(searchQueryProvider);
     final hasQuery = state.query.isNotEmpty;
 
@@ -80,9 +80,10 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
       });
     }
 
-    final fillColor = isDark
-        ? const Color(0xFF1E2235)
-        : const Color(0xFFEEF0F8);
+    final nc = Theme.of(context).extension<NoteColors>();
+    final textPrimary = Theme.of(context).textTheme.bodyMedium?.color;
+    final textSecondary = Theme.of(context).textTheme.labelSmall?.color;
+    final fillColor = nc?.searchBarFill;
 
     return SizedBox(
       height: NoteSearchBar.totalHeight,
@@ -92,32 +93,19 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
           controller: _controller,
           focusNode: _focusNode,
           onChanged: _onChanged,
-          style: TextStyle(
-            fontSize: 13,
-            color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1E293B),
-          ),
+          style: TextStyle(fontSize: 13, color: textPrimary),
           decoration: InputDecoration(
             hintText: 'Search notes…',
-            hintStyle: TextStyle(
-              fontSize: 13,
-              color:
-                  isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-            ),
+            hintStyle: TextStyle(fontSize: 13, color: textSecondary),
             prefixIcon: Icon(
               Icons.search_rounded,
               size: 18,
-              color: hasQuery
-                  ? scheme.primary
-                  : (isDark
-                      ? const Color(0xFF64748B)
-                      : const Color(0xFF94A3B8)),
+              color: hasQuery ? scheme.primary : textSecondary,
             ),
             suffixIcon: hasQuery
                 ? IconButton(
                     icon: const Icon(Icons.close_rounded, size: 16),
-                    color: isDark
-                        ? const Color(0xFF64748B)
-                        : const Color(0xFF94A3B8),
+                    color: textSecondary,
                     tooltip: 'Clear search (ESC)',
                     onPressed: () {
                       _clear();

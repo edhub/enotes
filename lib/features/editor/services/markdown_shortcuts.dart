@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Handles Bear-style markdown shortcuts for a text editor.
 ///
@@ -10,6 +11,74 @@ import 'package:flutter/material.dart';
 /// Unordered and ordered lists are mutually exclusive.
 class MarkdownShortcuts {
   MarkdownShortcuts._();
+
+  /// Handles keyboard shortcuts for a Markdown editor.
+  ///
+  /// Processes ESC (unfocus), Cmd+B (bold), Cmd+L (unordered list),
+  /// Shift+Cmd+L (ordered list). Returns [KeyEventResult.handled] if
+  /// a shortcut was matched, otherwise [KeyEventResult.ignored].
+  ///
+  /// [onApply] is called after a text-modifying shortcut is applied
+  /// (e.g. to trigger a save).
+  static KeyEventResult handleKeyEvent({
+    required KeyEvent event,
+    required FocusNode node,
+    required TextEditingController controller,
+    VoidCallback? onApply,
+  }) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    // ESC → unfocus
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      node.unfocus();
+      return KeyEventResult.handled;
+    }
+
+    final isCmd =
+        HardwareKeyboard.instance.isLogicalKeyPressed(
+              LogicalKeyboardKey.metaLeft,
+            ) ||
+            HardwareKeyboard.instance.isLogicalKeyPressed(
+              LogicalKeyboardKey.metaRight,
+            );
+    if (!isCmd) return KeyEventResult.ignored;
+
+    final isShift =
+        HardwareKeyboard.instance.isLogicalKeyPressed(
+              LogicalKeyboardKey.shiftLeft,
+            ) ||
+            HardwareKeyboard.instance.isLogicalKeyPressed(
+              LogicalKeyboardKey.shiftRight,
+            );
+
+    final shortcut = switch (event.logicalKey) {
+      LogicalKeyboardKey.keyB => toggleBold,
+      LogicalKeyboardKey.keyL when !isShift => toggleUnorderedList,
+      LogicalKeyboardKey.keyL when isShift => toggleOrderedList,
+      _ => null,
+    };
+    if (shortcut == null) return KeyEventResult.ignored;
+
+    applyShortcut(controller: controller, shortcut: shortcut);
+    onApply?.call();
+    return KeyEventResult.handled;
+  }
+
+  /// Applies a Markdown [shortcut] transformation to [controller]'s
+  /// current text and selection.
+  static void applyShortcut({
+    required TextEditingController controller,
+    required (String, TextSelection) Function(String, TextSelection) shortcut,
+  }) {
+    final (newText, newSel) = shortcut(
+      controller.text,
+      controller.selection,
+    );
+    controller.value = controller.value.copyWith(
+      text: newText,
+      selection: newSel,
+    );
+  }
 
   /// Toggles bold formatting (`*...*`) around the current selection.
   ///

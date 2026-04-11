@@ -83,7 +83,11 @@ class Note {
       );
 
   @override
-  String toString() =>
-      'Note(id: $id, isDraft: $isDraft, deleted: $isDeleted, '
-      'content: ${content.substring(0, content.length.clamp(0, 20))})';
+  String toString() {
+    final preview = content.length <= 20
+        ? content
+        : '${content.substring(0, 20)}…';
+    return 'Note(id: $id, isDraft: $isDraft, deleted: $isDeleted, '
+        'content: $preview)';
+  }
 }

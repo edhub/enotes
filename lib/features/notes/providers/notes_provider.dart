@@ -15,14 +15,16 @@ import '../services/notes_service.dart';
 /// after [NotesService.init] completes in [main].
 final notesServiceProvider = Provider<NotesService>((ref) {
   throw UnimplementedError(
-    'notesServiceProvider must be overridden in ProviderScope',
+    'notesServiceProvider must be overridden in ProviderScope. '
+    'Ensure NotesService.init() is called in main() before runApp().',
   );
 });
 
 /// Notes loaded at startup before [runApp]. Overridden in [ProviderScope].
 final initialNotesProvider = Provider<List<Note>>((ref) {
   throw UnimplementedError(
-    'initialNotesProvider must be overridden in ProviderScope',
+    'initialNotesProvider must be overridden in ProviderScope. '
+    'Ensure notes are loaded in main() before runApp().',
   );
 });
 
@@ -165,15 +167,25 @@ class NotesState {
 /// Business logic for all note mutations.
 ///
 /// Accessed via `ref.read(notesProvider.notifier)`.
+///
+/// Uses incremental saves: only dirty (added/modified) notes are upserted,
+/// and only permanently deleted notes are removed from the DB. This avoids
+/// full-table DELETE + INSERT on every keystroke.
 class NotesNotifier extends Notifier<NotesState> {
   Timer? _saveTimer;
+
+  /// IDs of notes that need to be upserted (added or modified).
+  final Set<String> _dirtyIds = {};
+
+  /// IDs of notes that have been permanently removed from the list.
+  final Set<String> _removedIds = {};
 
   @override
   NotesState build() {
     ref.onDispose(() => _saveTimer?.cancel());
 
     final initialNotes = ref.read(initialNotesProvider);
-    return _ensureFiveDrafts(
+    return _ensureDraftSlots(
       NotesState(notes: List<Note>.from(initialNotes)),
     );
   }
@@ -194,7 +206,7 @@ class NotesNotifier extends Notifier<NotesState> {
     final note = Note.create(content: content, isDraft: false);
     final updated = [note, ...state.notes];
     state = state.copyWith(notes: updated);
-    _scheduleSave();
+    _markDirty(note.id);
   }
 
   /// Updates note content in-place. Position in the list is preserved.
@@ -207,7 +219,7 @@ class NotesNotifier extends Notifier<NotesState> {
       updatedAt: DateTime.now().toUtc(),
     );
     state = state.copyWith(notes: updated);
-    _scheduleSave();
+    _markDirty(id);
   }
 
   /// Soft-deletes a regular note (moves to trash). Draft notes cannot be deleted.
@@ -221,7 +233,7 @@ class NotesNotifier extends Notifier<NotesState> {
     final updated = List<Note>.from(state.notes);
     updated[idx] = updated[idx].copyWith(deletedAt: DateTime.now().toUtc());
     state = state.copyWith(notes: updated);
-    _scheduleSave();
+    _markDirty(id);
   }
 
   /// Restores a soft-deleted note back to its original time column.
@@ -231,18 +243,23 @@ class NotesNotifier extends Notifier<NotesState> {
     final updated = List<Note>.from(state.notes);
     updated[idx] = updated[idx].copyWith(clearDeletedAt: true);
     state = state.copyWith(notes: updated);
-    _scheduleSave();
+    _markDirty(id);
   }
 
   /// Permanently removes a single note from storage (trash only).
   void permanentlyDeleteNote(String id) {
     final updated = state.notes.where((n) => n.id != id).toList();
     state = state.copyWith(notes: updated);
-    _scheduleSave();
+    _markRemoved(id);
   }
 
   /// Permanently removes all soft-deleted notes.
   void emptyTrash() {
+    final trashed = state.notes.where((n) => n.isDeleted).map((n) => n.id);
+    for (final id in trashed) {
+      _removedIds.add(id);
+      _dirtyIds.remove(id);
+    }
     final updated = state.notes.where((n) => !n.isDeleted).toList();
     state = state.copyWith(notes: updated);
     _scheduleSave();
@@ -255,11 +272,14 @@ class NotesNotifier extends Notifier<NotesState> {
   Future<void> importNotes(List<Note> notes) async {
     _saveTimer?.cancel();
     _saveTimer = null;
+    _dirtyIds.clear();
+    _removedIds.clear();
 
     var newState = NotesState(notes: List<Note>.from(notes));
-    newState = _ensureFiveDrafts(newState);
+    newState = _ensureDraftSlots(newState);
     state = newState;
 
+    // Full overwrite for import — uses DELETE + INSERT.
     await ref
         .read(notesServiceProvider)
         .saveNotes(List<Note>.unmodifiable(state.notes));
@@ -279,40 +299,61 @@ class NotesNotifier extends Notifier<NotesState> {
   void flushSave() {
     _saveTimer?.cancel();
     _saveTimer = null;
-    ref
-        .read(notesServiceProvider)
-        .saveNotes(List<Note>.unmodifiable(state.notes));
+    _persistDirty();
   }
 
   // ── Private ────────────────────────────────────────────────────────────────
 
   /// Ensures exactly [LayoutConstants.maxDraftNotes] draft slots exist.
-  /// If new drafts are created, saves to disk immediately.
-  NotesState _ensureFiveDrafts(NotesState s) {
+  /// If new drafts are created, upserts only the new ones immediately.
+  NotesState _ensureDraftSlots(NotesState s) {
     final existing = s.notes.where((n) => n.isDraft).length;
     if (existing >= LayoutConstants.maxDraftNotes) return s;
 
     final updated = List<Note>.from(s.notes);
+    final newDrafts = <Note>[];
     for (int i = existing; i < LayoutConstants.maxDraftNotes; i++) {
-      updated.add(Note.create(content: '', isDraft: true));
+      final draft = Note.create(content: '', isDraft: true);
+      updated.add(draft);
+      newDrafts.add(draft);
     }
-    // Save the newly created slots without waiting for the debounce timer.
-    unawaited(
-      ref
-          .read(notesServiceProvider)
-          .saveNotes(List<Note>.unmodifiable(updated)),
-    );
+    // Save only the newly created slots — no full-table rewrite.
+    unawaited(ref.read(notesServiceProvider).upsertNotes(newDrafts));
     return s.copyWith(notes: updated);
   }
 
-  /// Schedules a debounced (800 ms) save to disk.
+  void _markDirty(String id) {
+    _dirtyIds.add(id);
+    _removedIds.remove(id);
+    _scheduleSave();
+  }
+
+  void _markRemoved(String id) {
+    _removedIds.add(id);
+    _dirtyIds.remove(id);
+    _scheduleSave();
+  }
+
+  /// Schedules a debounced (800 ms) incremental save to disk.
   void _scheduleSave() {
     _saveTimer?.cancel();
-    _saveTimer = Timer(
-      const Duration(milliseconds: 800),
-      () => ref
-          .read(notesServiceProvider)
-          .saveNotes(List<Note>.unmodifiable(state.notes)),
-    );
+    _saveTimer = Timer(const Duration(milliseconds: 800), _persistDirty);
+  }
+
+  /// Writes only dirty and removed notes to the database.
+  void _persistDirty() {
+    final service = ref.read(notesServiceProvider);
+
+    if (_dirtyIds.isNotEmpty) {
+      final dirtyNotes =
+          state.notes.where((n) => _dirtyIds.contains(n.id)).toList();
+      unawaited(service.upsertNotes(dirtyNotes));
+      _dirtyIds.clear();
+    }
+
+    if (_removedIds.isNotEmpty) {
+      unawaited(service.deleteNotesByIds(Set<String>.from(_removedIds)));
+      _removedIds.clear();
+    }
   }
 }

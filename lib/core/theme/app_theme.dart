@@ -74,6 +74,10 @@ class NoteColors extends ThemeExtension<NoteColors> {
     required this.draftCardBackground,
     required this.dotActive,
     required this.dotInactive,
+    required this.editorText,
+    required this.editorHint,
+    required this.editorCursor,
+    required this.searchBarFill,
   });
 
   final Color cardBorder;
@@ -82,6 +86,10 @@ class NoteColors extends ThemeExtension<NoteColors> {
   final Color draftCardBackground;
   final Color dotActive;
   final Color dotInactive;
+  final Color editorText;
+  final Color editorHint;
+  final Color editorCursor;
+  final Color searchBarFill;
 
   static const light = NoteColors(
     cardBorder: Color(0xFFE2E8F0),
@@ -90,6 +98,10 @@ class NoteColors extends ThemeExtension<NoteColors> {
     draftCardBackground: Color(0xFFF8F9FC),
     dotActive: Color(0xFF6366F1),
     dotInactive: Color(0xFFCBD5E1),
+    editorText: Color(0xFF1F2328),
+    editorHint: Color(0x42000000), // Colors.black26
+    editorCursor: Color(0xFF6366F1), // matches seed
+    searchBarFill: Color(0xFFEEF0F8),
   );
 
   static const dark = NoteColors(
@@ -99,6 +111,10 @@ class NoteColors extends ThemeExtension<NoteColors> {
     draftCardBackground: Color(0xFF161929),
     dotActive: Color(0xFF6366F1),
     dotInactive: Color(0xFF334155),
+    editorText: Color(0xFFABB2BF),
+    editorHint: Color(0x3DFFFFFF), // Colors.white24
+    editorCursor: Color(0xFF528BFF),
+    searchBarFill: Color(0xFF1E2235),
   );
 
   @override
@@ -109,6 +125,10 @@ class NoteColors extends ThemeExtension<NoteColors> {
     Color? draftCardBackground,
     Color? dotActive,
     Color? dotInactive,
+    Color? editorText,
+    Color? editorHint,
+    Color? editorCursor,
+    Color? searchBarFill,
   }) =>
       NoteColors(
         cardBorder: cardBorder ?? this.cardBorder,
@@ -117,6 +137,10 @@ class NoteColors extends ThemeExtension<NoteColors> {
         draftCardBackground: draftCardBackground ?? this.draftCardBackground,
         dotActive: dotActive ?? this.dotActive,
         dotInactive: dotInactive ?? this.dotInactive,
+        editorText: editorText ?? this.editorText,
+        editorHint: editorHint ?? this.editorHint,
+        editorCursor: editorCursor ?? this.editorCursor,
+        searchBarFill: searchBarFill ?? this.searchBarFill,
       );
 
   @override
@@ -131,6 +155,10 @@ class NoteColors extends ThemeExtension<NoteColors> {
           Color.lerp(draftCardBackground, other.draftCardBackground, t)!,
       dotActive: Color.lerp(dotActive, other.dotActive, t)!,
       dotInactive: Color.lerp(dotInactive, other.dotInactive, t)!,
+      editorText: Color.lerp(editorText, other.editorText, t)!,
+      editorHint: Color.lerp(editorHint, other.editorHint, t)!,
+      editorCursor: Color.lerp(editorCursor, other.editorCursor, t)!,
+      searchBarFill: Color.lerp(searchBarFill, other.searchBarFill, t)!,
     );
   }
 }

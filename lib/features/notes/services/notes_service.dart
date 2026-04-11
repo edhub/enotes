@@ -59,31 +59,65 @@ class NotesService {
   ///
   /// Uses DELETE + INSERT rather than UPSERT so that permanently deleted notes
   /// are also removed from the DB when the provider removes them from its list.
+  ///
+  /// Only used for full imports. For incremental saves, prefer
+  /// [upsertNotes] + [deleteNotesByIds].
   Future<void> saveNotes(List<Note> notes) async {
     final db = _db;
     if (db == null) return;
     try {
       db.execute('BEGIN');
       db.execute('DELETE FROM notes');
-      final stmt = db.prepare(
-        'INSERT INTO notes (id, content, created_at, updated_at, is_draft, deleted_at) '
-        'VALUES (?, ?, ?, ?, ?, ?)',
-      );
+      final stmt = db.prepare(_insertSql);
       for (final n in notes) {
-        stmt.execute([
-          n.id,
-          n.content,
-          n.createdAt.toIso8601String(),
-          n.updatedAt.toIso8601String(),
-          n.isDraft ? 1 : 0,
-          n.deletedAt?.toIso8601String(),
-        ]);
+        stmt.execute(_noteParams(n));
       }
       stmt.dispose();
       db.execute('COMMIT');
     } catch (e, st) {
       db.execute('ROLLBACK');
       log('NotesService.saveNotes failed: $e', error: e, stackTrace: st);
+    }
+  }
+
+  /// Incrementally inserts or updates [notes] without touching other rows.
+  ///
+  /// Uses `INSERT OR REPLACE` so both new and modified notes are handled
+  /// in a single statement. Wrapped in a transaction for atomicity.
+  Future<void> upsertNotes(List<Note> notes) async {
+    if (notes.isEmpty) return;
+    final db = _db;
+    if (db == null) return;
+    try {
+      db.execute('BEGIN');
+      final stmt = db.prepare(_insertOrReplaceSql);
+      for (final n in notes) {
+        stmt.execute(_noteParams(n));
+      }
+      stmt.dispose();
+      db.execute('COMMIT');
+    } catch (e, st) {
+      db.execute('ROLLBACK');
+      log('NotesService.upsertNotes failed: $e', error: e, stackTrace: st);
+    }
+  }
+
+  /// Permanently removes notes with the given [ids] from the database.
+  Future<void> deleteNotesByIds(Set<String> ids) async {
+    if (ids.isEmpty) return;
+    final db = _db;
+    if (db == null) return;
+    try {
+      db.execute('BEGIN');
+      final stmt = db.prepare('DELETE FROM notes WHERE id = ?');
+      for (final id in ids) {
+        stmt.execute([id]);
+      }
+      stmt.dispose();
+      db.execute('COMMIT');
+    } catch (e, st) {
+      db.execute('ROLLBACK');
+      log('NotesService.deleteNotesByIds failed: $e', error: e, stackTrace: st);
     }
   }
 
@@ -94,6 +128,23 @@ class NotesService {
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
+
+  static const _insertSql =
+      'INSERT INTO notes (id, content, created_at, updated_at, is_draft, deleted_at) '
+      'VALUES (?, ?, ?, ?, ?, ?)';
+
+  static const _insertOrReplaceSql =
+      'INSERT OR REPLACE INTO notes (id, content, created_at, updated_at, is_draft, deleted_at) '
+      'VALUES (?, ?, ?, ?, ?, ?)';
+
+  List<Object?> _noteParams(Note n) => [
+        n.id,
+        n.content,
+        n.createdAt.toIso8601String(),
+        n.updatedAt.toIso8601String(),
+        n.isDraft ? 1 : 0,
+        n.deletedAt?.toIso8601String(),
+      ];
 
   Note _rowToNote(Row row) => Note(
         id: row['id'] as String,

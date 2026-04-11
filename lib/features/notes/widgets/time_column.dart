@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../editor/controllers/markdown_controller.dart';
 import '../../editor/services/markdown_shortcuts.dart';
 import '../../editor/widgets/markdown_editor.dart';
@@ -12,6 +10,7 @@ import '../providers/notes_provider.dart';
 import '../providers/search_provider.dart';
 import 'column_header.dart';
 import 'note_card.dart';
+import 'note_card_container.dart';
 
 /// A single time-group column (Today, Yesterday, This Week, etc.).
 ///
@@ -20,8 +19,7 @@ import 'note_card.dart';
 /// (or pressing ESC / Tab) saves the text as a brand-new note.
 ///
 /// Uses a [CustomScrollView] so the header sticks to the top while note cards
-/// scroll independently from all other columns. Note cards themselves have no
-/// internal scroll — they are always fully expanded to fit their content.
+/// scroll independently from all other columns.
 class TimeColumn extends ConsumerStatefulWidget {
   const TimeColumn({
     super.key,
@@ -82,7 +80,6 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
           // ── Note cards ────────────────────────────────────────────────────
           SliverPadding(
             padding: EdgeInsets.only(
-              // No extra top gap below the composer; keep it for non-today cols.
               top: isToday ? 0 : LayoutConstants.pageVPad,
               bottom: LayoutConstants.pageVPad * 4,
             ),
@@ -133,10 +130,9 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
 ///
 /// - Typing and then unfocusing (or pressing ESC) saves the content as a new
 ///   note and resets the composer to empty.
-/// - If unfocused while empty, nothing is saved.
 /// - Responds to [NotesProvider.newNoteFocusRequest] changes (triggered by
 ///   Cmd+K) to grab keyboard focus and scroll the column back to the top.
-/// - Supports the same Markdown shortcuts as [NoteCard] (Cmd+B, Cmd+L, …).
+/// - Supports the same Markdown shortcuts as [NoteCard] via shared handler.
 class _NewNoteComposer extends ConsumerStatefulWidget {
   const _NewNoteComposer({required this.scrollController});
 
@@ -175,54 +171,10 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
   // ── Key / focus listeners ─────────────────────────────────────────────────
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-
-    // ESC → unfocus (triggers save if non-empty)
-    if (event.logicalKey == LogicalKeyboardKey.escape) {
-      node.unfocus();
-      return KeyEventResult.handled;
-    }
-
-    final isCmd =
-        HardwareKeyboard.instance.isLogicalKeyPressed(
-          LogicalKeyboardKey.metaLeft,
-        ) ||
-        HardwareKeyboard.instance.isLogicalKeyPressed(
-          LogicalKeyboardKey.metaRight,
-        );
-    final isShift =
-        HardwareKeyboard.instance.isLogicalKeyPressed(
-          LogicalKeyboardKey.shiftLeft,
-        ) ||
-        HardwareKeyboard.instance.isLogicalKeyPressed(
-          LogicalKeyboardKey.shiftRight,
-        );
-
-    if (!isCmd) return KeyEventResult.ignored;
-
-    if (event.logicalKey == LogicalKeyboardKey.keyB) {
-      _applyShortcut(MarkdownShortcuts.toggleBold);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyL && !isShift) {
-      _applyShortcut(MarkdownShortcuts.toggleUnorderedList);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.keyL && isShift) {
-      _applyShortcut(MarkdownShortcuts.toggleOrderedList);
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
-  }
-
-  void _applyShortcut(
-    (String, TextSelection) Function(String, TextSelection) fn,
-  ) {
-    final (newText, newSel) = fn(_controller.text, _controller.selection);
-    _controller.value = _controller.value.copyWith(
-      text: newText,
-      selection: newSel,
+    return MarkdownShortcuts.handleKeyEvent(
+      event: event,
+      node: node,
+      controller: _controller,
     );
   }
 
@@ -235,7 +187,6 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
     final content = _controller.text;
     if (content.trim().isEmpty) return;
     ref.read(notesProvider.notifier).addNote(content);
-    // Reset composer so it is ready for the next note.
     _controller.value = TextEditingValue.empty;
   }
 
@@ -249,7 +200,6 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
       _lastFocusRequest = req;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        // Scroll Today column back to top so the composer is visible.
         if (widget.scrollController.hasClients) {
           widget.scrollController.animateTo(
             0,
@@ -261,33 +211,9 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
       });
     }
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final nc = Theme.of(context).extension<NoteColors>();
-
-    final borderColor = _focused
-        ? Theme.of(context).colorScheme.primary
-        : (nc?.cardBorder ?? Colors.grey.shade200);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
-      constraints: const BoxConstraints(minHeight: 52),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
-        borderRadius: BorderRadius.circular(LayoutConstants.cardBorderRadius),
-        border: Border.all(color: borderColor, width: 1.0),
-        boxShadow: _focused
-            ? [
-                BoxShadow(
-                  color: isDark
-                      ? Colors.black.withValues(alpha: 0.35)
-                      : Colors.black.withValues(alpha: 0.07),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
-      padding: const EdgeInsets.all(LayoutConstants.cardPadding),
+    return NoteCardContainer(
+      focused: _focused,
+      minHeight: 52,
       child: MarkdownEditor(
         controller: _controller,
         focusNode: _focusNode,

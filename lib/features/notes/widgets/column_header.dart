@@ -28,9 +28,8 @@ class ColumnHeader extends StatelessWidget {
       child: Row(
         children: [
           Text(label, style: tt.titleMedium),
-          if (noteCount != null && noteCount! > 0) ...[
-            const SizedBox(width: 8),
-            _CountBadge(count: noteCount!),
+          if (noteCount != null && noteCount! > 0) ...[            const SizedBox(width: 8),
+            CountBadge(count: noteCount!),
           ],
         ],
       ),
@@ -38,8 +37,11 @@ class ColumnHeader extends StatelessWidget {
   }
 }
 
-class _CountBadge extends StatelessWidget {
-  const _CountBadge({required this.count});
+/// Small rounded badge showing a numeric count.
+///
+/// Shared across [ColumnHeader], [TrashColumn], and other column headers.
+class CountBadge extends StatelessWidget {
+  const CountBadge({super.key, required this.count});
 
   final int count;
 

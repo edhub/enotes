@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
-import '../models/note.dart';
 import '../providers/notes_provider.dart';
+import 'column_header.dart';
+import 'trash_note_card.dart';
 
 /// The right-most column. Shows recently soft-deleted notes.
 ///
@@ -36,46 +37,47 @@ class _TrashColumnState extends ConsumerState<TrashColumn> {
       width: LayoutConstants.trashColumnWidth,
       height: widget.availableHeight,
       child: CustomScrollView(
-            controller: _scrollController,
-            slivers: [
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _TrashHeaderDelegate(
-                  count: notes.length,
-                  onEmptyTrash:
-                      notes.isEmpty ? null : ref.read(notesProvider.notifier).emptyTrash,
-                ),
+        controller: _scrollController,
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _TrashHeaderDelegate(
+              count: notes.length,
+              onEmptyTrash: notes.isEmpty
+                  ? null
+                  : ref.read(notesProvider.notifier).emptyTrash,
+            ),
+          ),
+          if (notes.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: _EmptyTrashState(),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.only(
+                top: LayoutConstants.pageVPad,
+                bottom: LayoutConstants.pageVPad * 4,
               ),
-              if (notes.isEmpty)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: const _EmptyTrashState(),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.only(
-                    top: LayoutConstants.pageVPad,
-                    bottom: LayoutConstants.pageVPad * 4,
-                  ),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => Padding(
-                        padding: const EdgeInsets.only(
-                          left: LayoutConstants.pageHPad,
-                          right: LayoutConstants.pageHPad,
-                          bottom: LayoutConstants.cardMarginBottom,
-                        ),
-                        child: TrashNoteCard(
-                          key: ValueKey(notes[i].id),
-                          note: notes[i],
-                        ),
-                      ),
-                      childCount: notes.length,
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => Padding(
+                    padding: const EdgeInsets.only(
+                      left: LayoutConstants.pageHPad,
+                      right: LayoutConstants.pageHPad,
+                      bottom: LayoutConstants.cardMarginBottom,
+                    ),
+                    child: TrashNoteCard(
+                      key: ValueKey(notes[i].id),
+                      note: notes[i],
                     ),
                   ),
+                  childCount: notes.length,
                 ),
-            ],
-          ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -139,7 +141,7 @@ class _TrashHeader extends StatelessWidget {
           Text('Recently Deleted', style: tt.titleMedium),
           if (count > 0) ...[
             const SizedBox(width: 8),
-            _CountBadge(count: count),
+            CountBadge(count: count),
           ],
           const Spacer(),
           if (onEmptyTrash != null)
@@ -156,23 +158,6 @@ class _TrashHeader extends StatelessWidget {
             ),
         ],
       ),
-    );
-  }
-}
-
-class _CountBadge extends StatelessWidget {
-  const _CountBadge({required this.count});
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text('$count', style: Theme.of(context).textTheme.labelSmall),
     );
   }
 }
@@ -197,147 +182,6 @@ class _EmptyTrashState extends StatelessWidget {
             style: Theme.of(context).textTheme.labelSmall,
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Trash note card ────────────────────────────────────────────────────────────
-
-/// A read-only card shown in the trash column.
-/// Provides "Restore" and "Delete Forever" actions, always visible.
-class TrashNoteCard extends ConsumerStatefulWidget {
-  const TrashNoteCard({super.key, required this.note});
-
-  final Note note;
-
-  @override
-  ConsumerState<TrashNoteCard> createState() => _TrashNoteCardState();
-}
-
-class _TrashNoteCardState extends ConsumerState<TrashNoteCard> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final nc = Theme.of(context).extension<NoteColors>();
-    final borderColor = nc?.cardBorder ?? Colors.grey.shade200;
-    final bgColor = Theme.of(context).cardTheme.color;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius:
-              BorderRadius.circular(LayoutConstants.cardBorderRadius),
-          border: Border.all(color: borderColor, width: 1.0),
-          boxShadow: _hovered
-              ? [
-                  BoxShadow(
-                    color: isDark
-                        ? Colors.black.withValues(alpha: 0.35)
-                        : Colors.black.withValues(alpha: 0.07),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        padding: const EdgeInsets.all(LayoutConstants.cardPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.access_time_rounded,
-                  size: 12,
-                  color: Theme.of(context).textTheme.labelSmall?.color,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _formatDeletedAt(widget.note.deletedAt!),
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-                const Spacer(),
-                _TrashAction(
-                  icon: Icons.restore_rounded,
-                  tooltip: 'Restore',
-                  color: Theme.of(context).colorScheme.primary,
-                  onTap: () => ref.read(notesProvider.notifier).restoreNote(widget.note.id),
-                ),
-                const SizedBox(width: 2),
-                _TrashAction(
-                  icon: Icons.delete_forever_rounded,
-                  tooltip: 'Delete Forever',
-                  color: Colors.red.shade400,
-                  onTap: () =>
-                      ref.read(notesProvider.notifier).permanentlyDeleteNote(widget.note.id),
-                ),
-              ],
-            ),
-            if (widget.note.content.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              SelectableText(
-                widget.note.content,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.color
-                          ?.withValues(alpha: 0.6),
-                      height: 1.55,
-                    ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDeletedAt(DateTime deletedAt) {
-    final local = deletedAt.toLocal();
-    final now = DateTime.now();
-    final diff = now.difference(local);
-    if (diff.inSeconds < 60) return 'deleted just now';
-    if (diff.inMinutes < 60) return 'deleted ${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return 'deleted ${diff.inHours}h ago';
-    if (diff.inDays == 1) return 'deleted yesterday';
-    if (diff.inDays < 30) return 'deleted ${diff.inDays}d ago';
-    return 'deleted ${diff.inDays ~/ 30}mo ago';
-  }
-}
-
-class _TrashAction extends StatelessWidget {
-  const _TrashAction({
-    required this.icon,
-    required this.tooltip,
-    required this.color,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(5),
-          child: Icon(icon, size: 15, color: color),
-        ),
       ),
     );
   }
