@@ -18,8 +18,7 @@ import 'note_card_container.dart';
 /// directly below the sticky header. Typing there and then unfocusing
 /// (or pressing ESC / Tab) saves the text as a brand-new note.
 ///
-/// Uses a [CustomScrollView] so the header sticks to the top while note cards
-/// scroll independently from all other columns.
+/// Uses a fixed header + independent [CustomScrollView] body per column.
 class TimeColumn extends ConsumerStatefulWidget {
   const TimeColumn({
     super.key,
@@ -50,40 +49,42 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
     return SizedBox(
       width: LayoutConstants.timeColumnWidth,
       height: widget.availableHeight,
-      child: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _ColumnHeaderDelegate(
-              label: widget.data.label,
-              count: widget.data.totalCount,
-            ),
+      child: Column(
+        children: [
+          ColumnHeader(
+            label: widget.data.label,
+            noteCount: widget.data.totalCount,
           ),
+          Expanded(
+            child: CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                // ── New-note composer (Today column only) ───────────────────
+                if (isToday)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      LayoutConstants.pageHPad,
+                      LayoutConstants.pageVPad,
+                      LayoutConstants.pageHPad,
+                      LayoutConstants.cardMarginBottom,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: _NewNoteComposer(
+                        scrollController: _scrollController,
+                      ),
+                    ),
+                  ),
 
-          // ── New-note composer (Today column only) ─────────────────────────
-          if (isToday)
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                LayoutConstants.pageHPad,
-                LayoutConstants.pageVPad,
-                LayoutConstants.pageHPad,
-                LayoutConstants.cardMarginBottom,
-              ),
-              sliver: SliverToBoxAdapter(
-                child: _NewNoteComposer(
-                  scrollController: _scrollController,
+                // ── Note cards ──────────────────────────────────────────────
+                SliverPadding(
+                  padding: EdgeInsets.only(
+                    top: isToday ? 0 : LayoutConstants.pageVPad,
+                    bottom: LayoutConstants.pageVPad * 4,
+                  ),
+                  sliver: _buildNoteList(context),
                 ),
-              ),
+              ],
             ),
-
-          // ── Note cards ────────────────────────────────────────────────────
-          SliverPadding(
-            padding: EdgeInsets.only(
-              top: isToday ? 0 : LayoutConstants.pageVPad,
-              bottom: LayoutConstants.pageVPad * 4,
-            ),
-            sliver: _buildNoteList(context),
           ),
         ],
       ),
@@ -223,29 +224,3 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
   }
 }
 
-// ── Column header sliver delegate ─────────────────────────────────────────────
-
-class _ColumnHeaderDelegate extends SliverPersistentHeaderDelegate {
-  _ColumnHeaderDelegate({required this.label, required this.count});
-
-  final String label;
-  final int count;
-
-  @override
-  double get minExtent => LayoutConstants.columnHeaderHeight;
-
-  @override
-  double get maxExtent => LayoutConstants.columnHeaderHeight;
-
-  @override
-  bool shouldRebuild(_ColumnHeaderDelegate old) =>
-      old.label != label || old.count != count;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) =>
-      ColumnHeader(label: label, noteCount: count);
-}

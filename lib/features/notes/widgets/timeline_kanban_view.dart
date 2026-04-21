@@ -124,17 +124,45 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
     _hScroll.jumpTo(target);
   }
 
+  void _resolveAsHorizontalScroll(PointerScrollEvent event) {
+    GestureBinding.instance.pointerSignalResolver.register(event, (
+      PointerSignalEvent e,
+    ) {
+      final scrollEvent = e as PointerScrollEvent;
+      _handleShiftScroll(scrollEvent.scrollDelta.dy);
+    });
+    GestureBinding.instance.pointerSignalResolver.resolve(event);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
           body: Stack(
             children: [
               _buildScrollArea(context),
+              _buildHeaderWheelLayer(),
               _buildJumpButton(),
               const _DataMenuButton(),
             ],
           ),
         );
+  }
+
+  Widget _buildHeaderWheelLayer() {
+    // 列头区域不需要按 Shift，所有滚轮事件均转横向
+    return Positioned(
+      left: 0,
+      right: 0,
+      top: 0,
+      height: LayoutConstants.columnHeaderHeight,
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerSignal: (event) {
+          if (event is! PointerScrollEvent) return;
+          _resolveAsHorizontalScroll(event);
+        },
+      ),
+    );
   }
 
   Widget _buildScrollArea(BuildContext context) {
@@ -143,7 +171,7 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
       onPointerSignal: (event) {
         if (event is! PointerScrollEvent) return;
         if (HardwareKeyboard.instance.isShiftPressed) {
-          _handleShiftScroll(event.scrollDelta.dy);
+          _resolveAsHorizontalScroll(event);
         }
       },
       child: Scrollbar(

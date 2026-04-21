@@ -9,9 +9,9 @@ import 'trash_note_card.dart';
 
 /// The right-most column. Shows recently soft-deleted notes.
 ///
-/// Mirrors the structure of [TimeColumn]: a [CustomScrollView] with a sticky
-/// header and per-column independent scrolling. Note cards are read-only and
-/// offer "Restore" and "Delete Forever" actions.
+/// Mirrors [TimeColumn]: a fixed header plus per-column independent scrolling
+/// body. Note cards are read-only and offer "Restore" and "Delete Forever"
+/// actions.
 class TrashColumn extends ConsumerStatefulWidget {
   const TrashColumn({super.key, required this.availableHeight});
 
@@ -36,77 +36,53 @@ class _TrashColumnState extends ConsumerState<TrashColumn> {
     return SizedBox(
       width: LayoutConstants.trashColumnWidth,
       height: widget.availableHeight,
-      child: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _TrashHeaderDelegate(
-              count: notes.length,
-              onEmptyTrash: notes.isEmpty
-                  ? null
-                  : ref.read(notesProvider.notifier).emptyTrash,
-            ),
+      child: Column(
+        children: [
+          _TrashHeader(
+            count: notes.length,
+            onEmptyTrash: notes.isEmpty
+                ? null
+                : ref.read(notesProvider.notifier).emptyTrash,
           ),
-          if (notes.isEmpty)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: _EmptyTrashState(),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.only(
-                top: LayoutConstants.pageVPad,
-                bottom: LayoutConstants.pageVPad * 4,
-              ),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) => Padding(
+          Expanded(
+            child: CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                if (notes.isEmpty)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _EmptyTrashState(),
+                  )
+                else
+                  SliverPadding(
                     padding: const EdgeInsets.only(
-                      left: LayoutConstants.pageHPad,
-                      right: LayoutConstants.pageHPad,
-                      bottom: LayoutConstants.cardMarginBottom,
+                      top: LayoutConstants.pageVPad,
+                      bottom: LayoutConstants.pageVPad * 4,
                     ),
-                    child: TrashNoteCard(
-                      key: ValueKey(notes[i].id),
-                      note: notes[i],
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) => Padding(
+                          padding: const EdgeInsets.only(
+                            left: LayoutConstants.pageHPad,
+                            right: LayoutConstants.pageHPad,
+                            bottom: LayoutConstants.cardMarginBottom,
+                          ),
+                          child: TrashNoteCard(
+                            key: ValueKey(notes[i].id),
+                            note: notes[i],
+                          ),
+                        ),
+                        childCount: notes.length,
+                      ),
                     ),
                   ),
-                  childCount: notes.length,
-                ),
-              ),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
-}
-
-// ── Sticky header delegate ────────────────────────────────────────────────────
-
-class _TrashHeaderDelegate extends SliverPersistentHeaderDelegate {
-  _TrashHeaderDelegate({required this.count, required this.onEmptyTrash});
-
-  final int count;
-  final VoidCallback? onEmptyTrash;
-
-  @override
-  double get minExtent => LayoutConstants.columnHeaderHeight;
-
-  @override
-  double get maxExtent => LayoutConstants.columnHeaderHeight;
-
-  @override
-  bool shouldRebuild(_TrashHeaderDelegate old) =>
-      old.count != count || old.onEmptyTrash != onEmptyTrash;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) =>
-      _TrashHeader(count: count, onEmptyTrash: onEmptyTrash);
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
