@@ -35,6 +35,14 @@ class TimeColumn extends ConsumerStatefulWidget {
 
 class _TimeColumnState extends ConsumerState<TimeColumn> {
   final _scrollController = ScrollController();
+  late final Set<String> _seenNoteIds;
+
+  @override
+  void initState() {
+    super.initState();
+    final allNotes = ref.read(notesProvider).notes;
+    _seenNoteIds = allNotes.map((n) => n.id).toSet();
+  }
 
   @override
   void dispose() {
@@ -105,17 +113,26 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
       delegate: SliverChildBuilderDelegate(
         (context, i) {
           final note = col.notes[i];
-          return Padding(
-            padding: const EdgeInsets.only(
-              left: LayoutConstants.pageHPad,
-              right: LayoutConstants.pageHPad,
-              bottom: LayoutConstants.cardMarginBottom,
-            ),
-            child: NoteCard(
-              key: ValueKey(note.id),
-              note: note,
-              isDraftView: false,
-              columnWidth: LayoutConstants.timeColumnWidth,
+          final isNew = !_seenNoteIds.contains(note.id);
+          if (isNew) {
+            _seenNoteIds.add(note.id);
+          }
+
+          return _SlideInNewItem(
+            key: ValueKey('slide-${note.id}'),
+            isNew: isNew,
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: LayoutConstants.pageHPad,
+                right: LayoutConstants.pageHPad,
+                bottom: LayoutConstants.cardMarginBottom,
+              ),
+              child: NoteCard(
+                key: ValueKey(note.id),
+                note: note,
+                isDraftView: false,
+                columnWidth: LayoutConstants.timeColumnWidth,
+              ),
             ),
           );
         },
@@ -219,6 +236,70 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
         controller: _controller,
         focusNode: _focusNode,
         hint: 'New note…',
+      ),
+    );
+  }
+}
+
+// ── Slide-in Animation ────────────────────────────────────────────────────────
+
+class _SlideInNewItem extends StatefulWidget {
+  const _SlideInNewItem({
+    super.key,
+    required this.child,
+    required this.isNew,
+  });
+
+  final Widget child;
+  final bool isNew;
+
+  @override
+  State<_SlideInNewItem> createState() => _SlideInNewItemState();
+}
+
+class _SlideInNewItemState extends State<_SlideInNewItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+
+    if (widget.isNew) {
+      _controller.forward();
+    } else {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isNew && _controller.value == 1.0) {
+      return widget.child;
+    }
+
+    return SizeTransition(
+      sizeFactor: CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutCubic,
+      ),
+      axisAlignment: -1.0, // Aligns to top, pushing content downwards
+      child: FadeTransition(
+        opacity: CurvedAnimation(
+          parent: _controller,
+          curve: Curves.easeIn,
+        ),
+        child: widget.child,
       ),
     );
   }
