@@ -25,6 +25,7 @@ class NoteCard extends ConsumerStatefulWidget {
     required this.note,
     required this.isDraftView,
     required this.columnWidth,
+    this.focusRequestToken,
     this.minHeight,
     this.minLines,
   });
@@ -32,6 +33,7 @@ class NoteCard extends ConsumerStatefulWidget {
   final Note note;
   final bool isDraftView;
   final double columnWidth;
+  final int? focusRequestToken;
   final double? minHeight;
   final int? minLines;
 
@@ -54,6 +56,12 @@ class _NoteCardState extends ConsumerState<NoteCard> {
     _focusNode = FocusNode(onKeyEvent: _handleKeyEvent)
       ..addListener(_onFocusChanged);
     _controller.addListener(_onTextChanged);
+    if (widget.focusRequestToken != null && widget.focusRequestToken! > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _focusNode.requestFocus();
+      });
+    }
   }
 
   @override
@@ -64,6 +72,13 @@ class _NoteCardState extends ConsumerState<NoteCard> {
       _updatingController = true;
       _controller.text = widget.note.content;
       _updatingController = false;
+    }
+    if (widget.focusRequestToken != null &&
+        widget.focusRequestToken != old.focusRequestToken) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _focusNode.requestFocus();
+      });
     }
   }
 

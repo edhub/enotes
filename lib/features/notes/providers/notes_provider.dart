@@ -54,6 +54,7 @@ class NotesState {
     required List<Note> notes,
     int activeDraftIndex = 0,
     int newNoteFocusRequest = 0,
+    int draftFocusRequest = 0,
   }) : this._(
           notes: notes,
           draftNotes: _computeDraftNotes(notes),
@@ -61,6 +62,7 @@ class NotesState {
           trashedNotes: _computeTrashedNotes(notes),
           activeDraftIndex: activeDraftIndex,
           newNoteFocusRequest: newNoteFocusRequest,
+          draftFocusRequest: draftFocusRequest,
         );
 
   /// Internal constructor: all fields supplied directly.
@@ -71,7 +73,8 @@ class NotesState {
       required this.timeColumns,
       required this.trashedNotes,
       required this.activeDraftIndex,
-      required this.newNoteFocusRequest});
+      required this.newNoteFocusRequest,
+      required this.draftFocusRequest});
 
   /// All notes in insertion order (index 0 = most recently added).
   final List<Note> notes;
@@ -95,6 +98,10 @@ class NotesState {
   /// (e.g. via Cmd+K). Widgets detect the increment and grab keyboard focus.
   final int newNoteFocusRequest;
 
+  /// Incremented each time user requests focus on the active draft note editor
+  /// (e.g. via Cmd+1~5). Draft card listens to this counter and grabs focus.
+  final int draftFocusRequest;
+
   /// All notes unmodifiable (for export / backup).
   List<Note> get allNotes => List<Note>.unmodifiable(notes);
 
@@ -107,6 +114,7 @@ class NotesState {
     List<Note>? notes,
     int? activeDraftIndex,
     int? newNoteFocusRequest,
+    int? draftFocusRequest,
   }) {
     if (notes == null) {
       // Only scalar fields changed — reuse existing list references.
@@ -117,6 +125,7 @@ class NotesState {
         trashedNotes: trashedNotes,
         activeDraftIndex: activeDraftIndex ?? this.activeDraftIndex,
         newNoteFocusRequest: newNoteFocusRequest ?? this.newNoteFocusRequest,
+        draftFocusRequest: draftFocusRequest ?? this.draftFocusRequest,
       );
     }
     // notes changed — recompute all derived views.
@@ -127,6 +136,7 @@ class NotesState {
       trashedNotes: _computeTrashedNotes(notes),
       activeDraftIndex: activeDraftIndex ?? this.activeDraftIndex,
       newNoteFocusRequest: newNoteFocusRequest ?? this.newNoteFocusRequest,
+      draftFocusRequest: draftFocusRequest ?? this.draftFocusRequest,
     );
   }
 
@@ -196,6 +206,13 @@ class NotesNotifier extends Notifier<NotesState> {
   void requestNewNoteFocus() {
     state = state.copyWith(
       newNoteFocusRequest: state.newNoteFocusRequest + 1,
+    );
+  }
+
+  /// Signals the currently active draft editor to take keyboard focus.
+  void requestDraftFocus() {
+    state = state.copyWith(
+      draftFocusRequest: state.draftFocusRequest + 1,
     );
   }
 
@@ -292,6 +309,20 @@ class NotesNotifier extends Notifier<NotesState> {
     final clamped = index.clamp(0, drafts.length - 1);
     if (state.activeDraftIndex == clamped) return;
     state = state.copyWith(activeDraftIndex: clamped);
+  }
+
+  /// Switches the active draft tab and asks the draft editor to grab focus.
+  ///
+  /// Unlike [setActiveDraftIndex], this always emits a focus request even when
+  /// the requested tab is already active.
+  void activateDraftAndFocus(int index) {
+    final drafts = state.draftNotes;
+    if (drafts.isEmpty) return;
+    final clamped = index.clamp(0, drafts.length - 1);
+    state = state.copyWith(
+      activeDraftIndex: clamped,
+      draftFocusRequest: state.draftFocusRequest + 1,
+    );
   }
 
   /// Cancels the debounce timer and writes to disk immediately.

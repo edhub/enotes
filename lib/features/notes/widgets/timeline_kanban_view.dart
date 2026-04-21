@@ -57,6 +57,24 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
     if (event is! KeyDownEvent) return false;
     if (!HardwareKeyboard.instance.isMetaPressed) return false;
 
+    final draftIndex = switch (event.logicalKey) {
+      LogicalKeyboardKey.digit1 => 0,
+      LogicalKeyboardKey.digit2 => 1,
+      LogicalKeyboardKey.digit3 => 2,
+      LogicalKeyboardKey.digit4 => 3,
+      LogicalKeyboardKey.digit5 => 4,
+      _ => null,
+    };
+    if (draftIndex != null) {
+      _hScroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+      ref.read(notesProvider.notifier).activateDraftAndFocus(draftIndex);
+      return true;
+    }
+
     // Cmd+K → focus the new-note composer in the Today column.
     if (event.logicalKey == LogicalKeyboardKey.keyK) {
       _hScroll.animateTo(

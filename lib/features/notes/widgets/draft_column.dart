@@ -34,6 +34,9 @@ class DraftColumn extends ConsumerWidget {
     final safeIndex = ref
         .watch(notesProvider.select((s) => s.activeDraftIndex))
         .clamp(0, drafts.length - 1);
+    final focusReq = ref.watch(
+      notesProvider.select((s) => s.draftFocusRequest),
+    );
 
     return SizedBox(
       width: LayoutConstants.draftColumnWidth,
@@ -63,6 +66,7 @@ class DraftColumn extends ConsumerWidget {
                     note: drafts[safeIndex],
                     isDraftView: true,
                     columnWidth: LayoutConstants.draftColumnWidth,
+                    focusRequestToken: focusReq,
                     minHeight: _cardHeight,
                     minLines: 30,
                   ),
