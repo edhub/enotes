@@ -66,38 +66,66 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
       _ => null,
     };
     if (draftIndex != null) {
-      _hScroll.animateTo(
-        0,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOut,
-      );
-      ref.read(notesProvider.notifier).activateDraftAndFocus(draftIndex);
+      _triggerFocusAction(() {
+        _hScroll.animateTo(
+          0,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut,
+        );
+        ref.read(notesProvider.notifier).activateDraftAndFocus(draftIndex);
+      });
       return true;
     }
 
     // Cmd+K → focus the new-note composer in the Today column.
     if (event.logicalKey == LogicalKeyboardKey.keyK) {
-      _hScroll.animateTo(
-        0,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOut,
-      );
-      ref.read(notesProvider.notifier).requestNewNoteFocus();
+      _triggerFocusAction(() {
+        _hScroll.animateTo(
+          0,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut,
+        );
+        ref.read(notesProvider.notifier).requestNewNoteFocus();
+      });
       return true;
     }
 
     // Cmd+F → focus the search bar in the Draft column.
     if (event.logicalKey == LogicalKeyboardKey.keyF) {
-      _hScroll.animateTo(
-        0,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOut,
-      );
-      ref.read(searchQueryProvider.notifier).requestFocus();
+      _triggerFocusAction(() {
+        _hScroll.animateTo(
+          0,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeInOut,
+        );
+        ref.read(searchQueryProvider.notifier).requestFocus();
+      });
       return true;
     }
 
     return false;
+  }
+
+  /// Executes a focus-triggering [action] immediately if some widget already
+  /// holds focus, or defers it by a short delay when nothing is focused.
+  ///
+  /// On macOS, calling `TextInput.setClient` (triggered internally by
+  /// `FocusNode.requestFocus`) while the OS "window became key" event is still
+  /// being processed causes the text-input connection to not activate until the
+  /// next window-activation cycle. The guard delay lets macOS complete its
+  /// focus hand-off before we ask Flutter to attach a text-input client.
+  void _triggerFocusAction(VoidCallback action) {
+    if (FocusManager.instance.primaryFocus != null && FocusManager.instance.primaryFocus!.context != null) {
+      // A widget already owns the keyboard — plain focus transfer works fine.
+      action();
+    } else {
+      // No widget is focused: we may be in the middle of a macOS window
+      // activation. Wait one frame + a small platform buffer before acting.
+      Future.delayed(const Duration(milliseconds: 80), () {
+        if (!mounted) return;
+        action();
+      });
+    }
   }
 
   void _onHScroll() {
