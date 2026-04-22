@@ -10,11 +10,16 @@ import '../providers/search_provider.dart';
 /// Writes directly to [searchQueryProvider]. An ESC key press or tapping the
 /// clear (×) button resets the query and removes focus.
 class NoteSearchBar extends ConsumerStatefulWidget {
-  const NoteSearchBar({super.key});
+  const NoteSearchBar({
+    super.key,
+    this.focusRequestToken,
+  });
 
   /// Total height including vertical padding — used by [DraftColumn] to
   /// adjust the available height for the draft card.
-  static const double totalHeight = 52.0;
+  static const double totalHeight = 46.0;
+
+  final int? focusRequestToken;
 
   @override
   ConsumerState<NoteSearchBar> createState() => _NoteSearchBarState();
@@ -31,23 +36,22 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
     super.initState();
     _controller = TextEditingController();
     _focusNode = FocusNode(onKeyEvent: _handleKey)..addListener(_onFocusChanged);
+  }
 
-    // React to Cmd+F focus requests via an event listener.
-    ref.listenManual<int>(
-      searchQueryProvider.select((s) => s.focusRequest),
-      (prev, next) {
-        if (prev == null || next == prev) return;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          _focusNode.requestFocus();
-          // Select all existing text so the user can immediately replace it.
-          _controller.selection = TextSelection(
-            baseOffset: 0,
-            extentOffset: _controller.text.length,
-          );
-        });
-      },
-    );
+  @override
+  void didUpdateWidget(NoteSearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusRequestToken != null &&
+        widget.focusRequestToken != oldWidget.focusRequestToken) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _focusNode.requestFocus();
+        _controller.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _controller.text.length,
+        );
+      });
+    }
   }
 
   @override
@@ -105,7 +109,7 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
     return SizedBox(
       height: NoteSearchBar.totalHeight,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: MouseRegion(
           onEnter: (_) => setState(() => _hovered = true),
           onExit: (_) => setState(() => _hovered = false),
@@ -143,17 +147,17 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
               filled: true,
               fillColor: fillColor,
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(vertical: 9),
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(color: borderColor),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(color: borderColor),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(color: scheme.primary, width: 1.4),
               ),
             ),

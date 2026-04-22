@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/notes_provider.dart';
+import '../providers/search_provider.dart';
 import 'note_card.dart';
 import 'note_search_bar.dart';
 
@@ -15,7 +16,7 @@ class DraftColumn extends ConsumerWidget {
 
   final double availableHeight;
 
-  static const _tabBarHeight = 44.0;
+  static const _tabBarHeight = 42.0;
 
   double get _cardHeight =>
       availableHeight -
@@ -37,66 +38,83 @@ class DraftColumn extends ConsumerWidget {
     final focusReq = ref.watch(
       notesProvider.select((s) => s.draftFocusRequest),
     );
+    final searchFocusReq = ref.watch(
+      searchQueryProvider.select((s) => s.focusRequest),
+    );
+
+    final headerBg = nc?.columnHeader ?? Theme.of(context).colorScheme.surface;
 
     return SizedBox(
       width: LayoutConstants.draftColumnWidth,
       height: availableHeight,
-      child: Column(
-        children: [
-          const NoteSearchBar(),
-          _ChromeTabBar(
-            count: drafts.length,
-            activeIndex: safeIndex,
-            activeBg: draftBg,
-            borderColor: borderColor,
-          ),
-          Expanded(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: draftBg,
-                border: Border(
-                  left: BorderSide(color: borderColor),
-                  right: BorderSide(color: borderColor),
-                  bottom: BorderSide(color: borderColor),
-                ),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(18),
-                  bottomRight: Radius.circular(18),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.black.withValues(alpha: 0.16)
-                        : Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: LayoutConstants.pageVPad,
-                ),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  transitionBuilder: (child, anim) => FadeTransition(
-                    opacity: anim,
-                    child: child,
-                  ),
-                  child: NoteCard(
-                    key: ValueKey(drafts[safeIndex].id),
-                    note: drafts[safeIndex],
-                    isDraftView: true,
-                    columnWidth: LayoutConstants.draftColumnWidth,
-                    focusRequestToken: focusReq,
-                    minHeight: _cardHeight,
-                    minLines: 30,
-                  ),
-                ),
-              ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: draftBg,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black.withValues(alpha: 0.16)
+                  : Colors.black.withValues(alpha: 0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Column(
+            children: [
+              ColoredBox(
+                color: headerBg,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: LayoutConstants.pageHPad,
+                  ),
+                  child: NoteSearchBar(focusRequestToken: searchFocusReq),
+                ),
+              ),
+              Container(
+                color: headerBg,
+                child: _ChromeTabBar(
+                  count: drafts.length,
+                  activeIndex: safeIndex,
+                  activeBg: draftBg,
+                  borderColor: borderColor,
+                  backgroundColor: headerBg,
+                ),
+              ),
+              Expanded(
+                child: ColoredBox(
+                  color: draftBg,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: LayoutConstants.pageHPad,
+                      vertical: LayoutConstants.pageVPad,
+                    ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      transitionBuilder: (child, anim) => FadeTransition(
+                        opacity: anim,
+                        child: child,
+                      ),
+                      child: NoteCard(
+                        key: ValueKey(drafts[safeIndex].id),
+                        note: drafts[safeIndex],
+                        isDraftView: true,
+                        columnWidth: LayoutConstants.draftColumnWidth,
+                        focusRequestToken: focusReq,
+                        minHeight: _cardHeight,
+                        minLines: 30,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -110,16 +128,17 @@ class _ChromeTabBar extends ConsumerWidget {
     required this.activeIndex,
     required this.activeBg,
     required this.borderColor,
+    required this.backgroundColor,
   });
 
   final int count;
   final int activeIndex;
   final Color activeBg;
   final Color borderColor;
+  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
     final nc = Theme.of(context).extension<NoteColors>();
 
     final inactiveBg =
@@ -127,11 +146,11 @@ class _ChromeTabBar extends ConsumerWidget {
 
     return Container(
       height: DraftColumn._tabBarHeight,
-      color: scaffoldBg,
+      color: backgroundColor,
       padding: const EdgeInsets.only(
         left: LayoutConstants.pageHPad,
         right: LayoutConstants.pageHPad,
-        top: 8,
+        top: 6,
         // No bottom padding: active tab's bottom edge touches content area.
       ),
       child: Row(

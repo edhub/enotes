@@ -65,6 +65,9 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
     final borderColor = nc?.columnBorder ?? Theme.of(context).dividerColor;
     final columnSurface =
         nc?.columnSurface ?? Theme.of(context).colorScheme.surface;
+    final composerFocusReq = ref.watch(
+      notesProvider.select((s) => s.newNoteFocusRequest),
+    );
 
     return SizedBox(
       width: LayoutConstants.timeColumnWidth,
@@ -105,11 +108,12 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
                             LayoutConstants.pageHPad,
                             LayoutConstants.pageVPad,
                             LayoutConstants.pageHPad,
-                            LayoutConstants.cardMarginBottom,
+                            10,
                           ),
                           sliver: SliverToBoxAdapter(
-                            child: _NewNoteComposer(
+                            child: _TodayComposerSection(
                               scrollController: _scrollController,
+                              focusRequestToken: composerFocusReq,
                             ),
                           ),
                         ),
@@ -181,6 +185,34 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
 
 // ── New-note composer ─────────────────────────────────────────────────────────
 
+class _TodayComposerSection extends StatelessWidget {
+  const _TodayComposerSection({
+    required this.scrollController,
+    required this.focusRequestToken,
+  });
+
+  final ScrollController scrollController;
+  final int focusRequestToken;
+
+  @override
+  Widget build(BuildContext context) {
+    final nc = Theme.of(context).extension<NoteColors>();
+    final dividerColor = nc?.columnBorder ?? Theme.of(context).dividerColor;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _NewNoteComposer(
+          scrollController: scrollController,
+          focusRequestToken: focusRequestToken,
+        ),
+        const SizedBox(height: 10),
+        Divider(height: 1, thickness: 1, color: dividerColor),
+      ],
+    );
+  }
+}
+
 /// Always-visible input card at the top of the Today column.
 ///
 /// - Typing and then unfocusing (or pressing ESC) saves the content as a new
@@ -189,9 +221,13 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
 ///   Cmd+K) to grab keyboard focus and scroll the column back to the top.
 /// - Supports the same Markdown shortcuts as [NoteCard] via shared handler.
 class _NewNoteComposer extends ConsumerStatefulWidget {
-  const _NewNoteComposer({required this.scrollController});
+  const _NewNoteComposer({
+    required this.scrollController,
+    required this.focusRequestToken,
+  });
 
   final ScrollController scrollController;
+  final int focusRequestToken;
 
   @override
   ConsumerState<_NewNoteComposer> createState() => _NewNoteComposerState();
@@ -208,26 +244,24 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
     _controller = MarkdownController();
     _focusNode = FocusNode(onKeyEvent: _handleKeyEvent)
       ..addListener(_onFocusChanged);
+  }
 
-    // React to Cmd+K focus requests via an event listener (event-driven);
-    // doing this in build() forces a per-frame compare and is fragile.
-    ref.listenManual<int>(
-      notesProvider.select((s) => s.newNoteFocusRequest),
-      (prev, next) {
-        if (prev == null || next == prev) return;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          if (widget.scrollController.hasClients) {
-            widget.scrollController.animateTo(
-              0,
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOut,
-            );
-          }
-          _focusNode.requestFocus();
-        });
-      },
-    );
+  @override
+  void didUpdateWidget(covariant _NewNoteComposer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusRequestToken != oldWidget.focusRequestToken) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (widget.scrollController.hasClients) {
+          widget.scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+          );
+        }
+        _focusNode.requestFocus();
+      });
+    }
   }
 
   @override

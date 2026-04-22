@@ -116,7 +116,8 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
   /// next window-activation cycle. The guard delay lets macOS complete its
   /// focus hand-off before we ask Flutter to attach a text-input client.
   void _triggerFocusAction(VoidCallback action) {
-    if (FocusManager.instance.primaryFocus != null && FocusManager.instance.primaryFocus!.context != null) {
+    if (FocusManager.instance.primaryFocus != null &&
+        FocusManager.instance.primaryFocus!.context != null) {
       // A widget already owns the keyboard — plain focus transfer works fine.
       action();
     } else {
@@ -183,7 +184,7 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
       left: 0,
       right: 0,
       top: 0,
-      height: LayoutConstants.columnHeaderHeight,
+      height: LayoutConstants.columnHeaderHeight + LayoutConstants.pageHPad * 2,
       child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerSignal: (event) {
@@ -211,7 +212,15 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
           scrollDirection: Axis.horizontal,
           child: SizedBox(
             height: availH,
-            child: _buildRow(context, availH),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: LayoutConstants.pageHPad,
+              ),
+              child: _buildRow(
+                context,
+                availH - LayoutConstants.pageHPad * 2,
+              ),
+            ),
           ),
         ),
       ),
@@ -245,8 +254,8 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
     final nc = Theme.of(context).extension<NoteColors>();
 
     return Positioned(
-      left: 24,
-      bottom: 24,
+      left: LayoutConstants.pageHPad + 8,
+      bottom: LayoutConstants.pageHPad + 8,
       child: AnimatedOpacity(
         opacity: _showJumpButton ? 1.0 : 0.0,
         duration: const Duration(milliseconds: 200),
@@ -293,8 +302,8 @@ class _DataMenuButtonState extends ConsumerState<_DataMenuButton> {
     final nc = Theme.of(context).extension<NoteColors>();
 
     return Positioned(
-      right: 24,
-      top: 16,
+      right: LayoutConstants.pageHPad + 8,
+      top: LayoutConstants.pageHPad,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: nc?.controlSurface ?? Theme.of(context).cardTheme.color,
