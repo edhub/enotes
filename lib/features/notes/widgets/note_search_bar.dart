@@ -23,12 +23,14 @@ class NoteSearchBar extends ConsumerStatefulWidget {
 class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
+  bool _hovered = false;
+  bool _focused = false;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
-    _focusNode = FocusNode(onKeyEvent: _handleKey);
+    _focusNode = FocusNode(onKeyEvent: _handleKey)..addListener(_onFocusChanged);
 
     // React to Cmd+F focus requests via an event listener.
     ref.listenManual<int>(
@@ -51,8 +53,14 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
   @override
   void dispose() {
     _controller.dispose();
-    _focusNode.dispose();
+    _focusNode
+      ..removeListener(_onFocusChanged)
+      ..dispose();
     super.dispose();
+  }
+
+  void _onFocusChanged() {
+    setState(() => _focused = _focusNode.hasFocus);
   }
 
   KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
@@ -87,51 +95,67 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
     final nc = Theme.of(context).extension<NoteColors>();
     final textPrimary = Theme.of(context).textTheme.bodyMedium?.color;
     final textSecondary = Theme.of(context).textTheme.labelSmall?.color;
-    final fillColor = nc?.searchBarFill;
+    final fillColor = _focused || _hovered
+        ? (nc?.controlSurfaceHover ?? nc?.searchBarFill)
+        : nc?.searchBarFill;
+    final borderColor = _focused
+        ? scheme.primary
+        : (nc?.searchBarBorder ?? Colors.transparent);
 
     return SizedBox(
       height: NoteSearchBar.totalHeight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        child: TextField(
-          controller: _controller,
-          focusNode: _focusNode,
-          onChanged: _onChanged,
-          style: TextStyle(fontSize: 13, color: textPrimary),
-          decoration: InputDecoration(
-            hintText: 'Search notes…',
-            hintStyle: TextStyle(fontSize: 13, color: textSecondary),
-            prefixIcon: Icon(
-              Icons.search_rounded,
-              size: 18,
-              color: hasQuery ? scheme.primary : textSecondary,
-            ),
-            suffixIcon: hasQuery
-                ? IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 16),
-                    color: textSecondary,
-                    tooltip: 'Clear search (ESC)',
-                    onPressed: () {
-                      _clear();
-                      _focusNode.unfocus();
-                    },
-                  )
-                : null,
-            filled: true,
-            fillColor: fillColor,
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 8),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20),
-              borderSide: BorderSide(color: scheme.primary, width: 1.5),
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: TextField(
+            controller: _controller,
+            focusNode: _focusNode,
+            onChanged: _onChanged,
+            style: TextStyle(fontSize: 13, color: textPrimary),
+            decoration: InputDecoration(
+              hintText: 'Search notes…',
+              hintStyle: TextStyle(fontSize: 13, color: textSecondary),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(left: 2),
+                child: Icon(
+                  Icons.search_rounded,
+                  size: 18,
+                  color: hasQuery || _focused ? scheme.primary : textSecondary,
+                ),
+              ),
+              prefixIconConstraints: const BoxConstraints(
+                minWidth: 34,
+                minHeight: 34,
+              ),
+              suffixIcon: hasQuery
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      color: textSecondary,
+                      tooltip: 'Clear search (ESC)',
+                      onPressed: () {
+                        _clear();
+                        _focusNode.unfocus();
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: fillColor,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 9),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(color: scheme.primary, width: 1.4),
+              ),
             ),
           ),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../editor/controllers/markdown_controller.dart';
 import '../../editor/services/markdown_shortcuts.dart';
 import '../../editor/widgets/markdown_editor.dart';
@@ -60,48 +61,74 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
   @override
   Widget build(BuildContext context) {
     final isToday = widget.data.bucketKey == 'today';
+    final nc = Theme.of(context).extension<NoteColors>();
+    final borderColor = nc?.columnBorder ?? Theme.of(context).dividerColor;
+    final columnSurface =
+        nc?.columnSurface ?? Theme.of(context).colorScheme.surface;
 
     return SizedBox(
       width: LayoutConstants.timeColumnWidth,
       height: widget.availableHeight,
-      child: Column(
-        children: [
-          ColumnHeader(
-            label: widget.data.label,
-            noteCount: widget.data.totalCount,
-          ),
-          Expanded(
-            child: CustomScrollView(
-              controller: _scrollController,
-              slivers: [
-                // ── New-note composer (Today column only) ───────────────────
-                if (isToday)
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(
-                      LayoutConstants.pageHPad,
-                      LayoutConstants.pageVPad,
-                      LayoutConstants.pageHPad,
-                      LayoutConstants.cardMarginBottom,
-                    ),
-                    sliver: SliverToBoxAdapter(
-                      child: _NewNoteComposer(
-                        scrollController: _scrollController,
-                      ),
-                    ),
-                  ),
-
-                // ── Note cards ──────────────────────────────────────────────
-                SliverPadding(
-                  padding: EdgeInsets.only(
-                    top: isToday ? 0 : LayoutConstants.pageVPad,
-                    bottom: LayoutConstants.pageVPad * 4,
-                  ),
-                  sliver: _buildNoteList(context),
-                ),
-              ],
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: columnSurface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black.withValues(alpha: 0.16)
+                  : Colors.black.withValues(alpha: 0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Column(
+            children: [
+              ColumnHeader(
+                label: widget.data.label,
+                noteCount: widget.data.totalCount,
+              ),
+              Expanded(
+                child: ColoredBox(
+                  color: columnSurface,
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    slivers: [
+                      // ── New-note composer (Today column only) ─────────────
+                      if (isToday)
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(
+                            LayoutConstants.pageHPad,
+                            LayoutConstants.pageVPad,
+                            LayoutConstants.pageHPad,
+                            LayoutConstants.cardMarginBottom,
+                          ),
+                          sliver: SliverToBoxAdapter(
+                            child: _NewNoteComposer(
+                              scrollController: _scrollController,
+                            ),
+                          ),
+                        ),
+
+                      // ── Note cards ────────────────────────────────────────
+                      SliverPadding(
+                        padding: EdgeInsets.only(
+                          top: isToday ? 0 : LayoutConstants.pageVPad,
+                          bottom: LayoutConstants.pageVPad * 4,
+                        ),
+                        sliver: _buildNoteList(context),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

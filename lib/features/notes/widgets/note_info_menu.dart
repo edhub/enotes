@@ -85,6 +85,7 @@ class _NoteInfoButtonState extends State<NoteInfoButton> {
 
   @override
   Widget build(BuildContext context) {
+    final nc = Theme.of(context).extension<NoteColors>();
     final iconColor = Theme.of(context).textTheme.labelSmall?.color;
     final visible = widget.hovered || widget.focused;
 
@@ -99,21 +100,25 @@ class _NoteInfoButtonState extends State<NoteInfoButton> {
             groupId: _link,
             child: Tooltip(
               message: 'Note info',
-              child: InkWell(
-                borderRadius: BorderRadius.circular(6),
-                onTap: () => NoteInfoMenu.show(
-                  context: context,
-                  noteId: widget.note.id,
-                  link: _link,
-                  note: widget.note,
-                  isDraftView: widget.isDraftView,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(5),
-                  child: Icon(
-                    Icons.more_horiz_rounded,
-                    size: 15,
-                    color: iconColor,
+              child: Material(
+                color: nc?.hoverTint ?? Colors.transparent,
+                borderRadius: BorderRadius.circular(999),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: () => NoteInfoMenu.show(
+                    context: context,
+                    noteId: widget.note.id,
+                    link: _link,
+                    note: widget.note,
+                    isDraftView: widget.isDraftView,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.more_horiz_rounded,
+                      size: 15,
+                      color: iconColor,
+                    ),
                   ),
                 ),
               ),
@@ -184,24 +189,21 @@ class _InfoPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final nc = Theme.of(context).extension<NoteColors>();
-    final bgColor = Theme.of(context).cardTheme.color ?? Colors.white;
-    final borderColor = nc?.cardBorder ?? Colors.grey.shade200;
+    final bgColor = nc?.controlSurface ?? Theme.of(context).cardTheme.color ?? Colors.white;
+    final borderColor = nc?.columnBorder ?? Colors.grey.shade200;
 
     return Container(
-      width: 216,
+      width: 228,
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.45)
-                : Colors.black.withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: nc?.popoverShadow ?? Colors.black.withValues(alpha: 0.16),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -218,7 +220,7 @@ class _InfoPopover extends StatelessWidget {
                   label: 'Modified',
                   time: note.updatedAt.toLocal(),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 _TimeRow(
                   icon: Icons.calendar_today_rounded,
                   label: 'Created',
@@ -256,14 +258,22 @@ class _TimeRow extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(fontSize: 10, color: secondary)),
-            const SizedBox(height: 1),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10,
+                color: secondary,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
+            ),
+            const SizedBox(height: 2),
             Text(
               DateFormatter.absolute(time),
               style: TextStyle(
                 fontSize: 12,
                 color: primary,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -288,7 +298,8 @@ class _DeleteRowState extends ConsumerState<_DeleteRow> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final nc = Theme.of(context).extension<NoteColors>();
+    final destructive = nc?.destructive ?? Colors.red.shade400;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -301,28 +312,28 @@ class _DeleteRowState extends ConsumerState<_DeleteRow> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           decoration: BoxDecoration(
-            color: _hovered
-                ? (isDark
-                      ? Colors.red.withValues(alpha: 0.12)
-                      : Colors.red.withValues(alpha: 0.06))
-                : Colors.transparent,
+            color: _hovered ? (nc?.destructiveSoft ?? Colors.transparent) : Colors.transparent,
             borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(10),
-              bottomRight: Radius.circular(10),
+              bottomLeft: Radius.circular(14),
+              bottomRight: Radius.circular(14),
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           child: Row(
             children: [
               Icon(
                 Icons.delete_outline_rounded,
                 size: 14,
-                color: Colors.red.shade400,
+                color: destructive,
               ),
               const SizedBox(width: 10),
               Text(
                 'Move to Trash',
-                style: TextStyle(fontSize: 13, color: Colors.red.shade400),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: destructive,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),

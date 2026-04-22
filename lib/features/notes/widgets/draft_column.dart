@@ -28,7 +28,7 @@ class DraftColumn extends ConsumerWidget {
     final nc = Theme.of(context).extension<NoteColors>();
     final draftBg =
         nc?.draftCardBackground ?? Theme.of(context).cardTheme.color!;
-    final borderColor = nc?.cardBorder ?? const Color(0xFFE2E8F0);
+    final borderColor = nc?.columnBorder ?? const Color(0xFFE2E8F0);
 
     final drafts = ref.watch(notesProvider.select((s) => s.draftNotes));
     final safeIndex = ref
@@ -51,16 +51,38 @@ class DraftColumn extends ConsumerWidget {
             borderColor: borderColor,
           ),
           Expanded(
-            child: ColoredBox(
-              color: draftBg,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: draftBg,
+                border: Border(
+                  left: BorderSide(color: borderColor),
+                  right: BorderSide(color: borderColor),
+                  bottom: BorderSide(color: borderColor),
+                ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(18),
+                  bottomRight: Radius.circular(18),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.black.withValues(alpha: 0.16)
+                        : Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   vertical: LayoutConstants.pageVPad,
                 ),
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  transitionBuilder: (child, anim) =>
-                      FadeTransition(opacity: anim, child: child),
+                  duration: const Duration(milliseconds: 220),
+                  transitionBuilder: (child, anim) => FadeTransition(
+                    opacity: anim,
+                    child: child,
+                  ),
                   child: NoteCard(
                     key: ValueKey(drafts[safeIndex].id),
                     note: drafts[safeIndex],
@@ -98,17 +120,13 @@ class _ChromeTabBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final nc = Theme.of(context).extension<NoteColors>();
 
-    // Inactive tabs sit slightly above the scaffold colour.
-    final inactiveBg = isDark
-        ? Color.alphaBlend(Colors.white.withValues(alpha: 0.05), scaffoldBg)
-        : Color.alphaBlend(Colors.black.withValues(alpha: 0.04), scaffoldBg);
+    final inactiveBg =
+        nc?.controlSurface ?? Theme.of(context).colorScheme.surface;
 
     return Container(
       height: DraftColumn._tabBarHeight,
-      // Tab bar is the same colour as the outer scaffold — tabs appear to
-      // "float" on top of it.
       color: scaffoldBg,
       padding: const EdgeInsets.only(
         left: LayoutConstants.pageHPad,
@@ -168,22 +186,20 @@ class _ChromeTabState extends State<_ChromeTab> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final nc = Theme.of(context).extension<NoteColors>();
 
     if (widget.isActive) {
       return Container(
         decoration: BoxDecoration(
           color: widget.activeBg,
-          // Rounded top corners only — bottom is open, merging with content.
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(8),
-            topRight: Radius.circular(8),
+            topLeft: Radius.circular(10),
+            topRight: Radius.circular(10),
           ),
           border: Border(
             top: BorderSide(color: widget.borderColor),
             left: BorderSide(color: widget.borderColor),
             right: BorderSide(color: widget.borderColor),
-            // No bottom border → seamless join with content area.
           ),
         ),
         alignment: Alignment.center,
@@ -191,23 +207,16 @@ class _ChromeTabState extends State<_ChromeTab> {
           widget.label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
             color: scheme.primary,
           ),
         ),
       );
     }
 
-    // ── Inactive tab ────────────────────────────────────────────────────────
-    final hoverBg = isDark
-        ? Color.alphaBlend(
-            Colors.white.withValues(alpha: 0.07),
-            widget.inactiveBg,
-          )
-        : Color.alphaBlend(
-            Colors.black.withValues(alpha: 0.05),
-            widget.inactiveBg,
-          );
+    final hoverBg = _hovered
+        ? (nc?.controlSurfaceHover ?? widget.inactiveBg)
+        : widget.inactiveBg;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -217,19 +226,23 @@ class _ChromeTabState extends State<_ChromeTab> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          // Slight top + bottom margin makes inactive tabs visually shorter
-          // than the active tab, reinforcing the Chrome affordance.
-          margin: const EdgeInsets.only(top: 3, bottom: 2),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.only(top: 4, bottom: 3),
           decoration: BoxDecoration(
-            color: _hovered ? hoverBg : widget.inactiveBg,
-            borderRadius: BorderRadius.circular(7),
+            color: hoverBg,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(
+              color: _hovered
+                  ? (nc?.cardBorderHover ?? widget.borderColor)
+                  : Colors.transparent,
+            ),
           ),
           alignment: Alignment.center,
           child: Text(
             widget.label,
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
               color: Theme.of(context).textTheme.labelSmall?.color,
             ),
           ),

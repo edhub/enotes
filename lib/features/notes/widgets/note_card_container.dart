@@ -32,31 +32,81 @@ class NoteCardContainer extends StatelessWidget {
     final nc = Theme.of(context).extension<NoteColors>();
 
     final borderColor = focused
-        ? Theme.of(context).colorScheme.primary
+        ? (nc?.cardBorderFocused ?? Theme.of(context).colorScheme.primary)
+        : hovered
+        ? (nc?.cardBorderHover ?? nc?.cardBorder ?? Colors.grey.shade200)
         : (nc?.cardBorder ?? Colors.grey.shade200);
 
     final bgColor = backgroundColor ?? Theme.of(context).cardTheme.color;
 
+    final shadow = switch ((focused, hovered, isDark)) {
+      (true, _, true) => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.28),
+          blurRadius: 22,
+          offset: const Offset(0, 10),
+        ),
+        BoxShadow(
+          color: (nc?.cardBorderFocused ?? Theme.of(context).colorScheme.primary)
+              .withValues(alpha: 0.18),
+          blurRadius: 0,
+          spreadRadius: 2,
+        ),
+      ],
+      (true, _, false) => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.10),
+          blurRadius: 20,
+          offset: const Offset(0, 10),
+        ),
+        BoxShadow(
+          color: (nc?.cardBorderFocused ?? Theme.of(context).colorScheme.primary)
+              .withValues(alpha: 0.14),
+          blurRadius: 0,
+          spreadRadius: 2,
+        ),
+      ],
+      (false, true, true) => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.22),
+          blurRadius: 18,
+          offset: const Offset(0, 8),
+        ),
+      ],
+      (false, true, false) => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.07),
+          blurRadius: 16,
+          offset: const Offset(0, 8),
+        ),
+      ],
+      (_, _, true) => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.12),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+      _ => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.04),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    };
+
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOutCubic,
       constraints: minHeight != null
           ? BoxConstraints(minHeight: minHeight!)
           : const BoxConstraints(),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(LayoutConstants.cardBorderRadius),
-        border: Border.all(color: borderColor, width: 1.0),
-        boxShadow: (focused || hovered)
-            ? [
-                BoxShadow(
-                  color: isDark
-                      ? Colors.black.withValues(alpha: 0.35)
-                      : Colors.black.withValues(alpha: 0.07),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
+        border: Border.all(color: borderColor, width: focused ? 1.15 : 1.0),
+        boxShadow: shadow,
       ),
       padding: padding ?? const EdgeInsets.all(LayoutConstants.cardPadding),
       child: child,

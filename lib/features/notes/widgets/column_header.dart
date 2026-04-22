@@ -21,14 +21,22 @@ class ColumnHeader extends StatelessWidget {
 
     return Container(
       height: LayoutConstants.columnHeaderHeight,
-      color: nc?.columnHeader ?? Theme.of(context).colorScheme.surface,
+      decoration: BoxDecoration(
+        color: nc?.columnHeader ?? Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: nc?.columnBorder ?? Theme.of(context).dividerColor,
+          ),
+        ),
+      ),
       padding: const EdgeInsets.symmetric(
-        horizontal: LayoutConstants.pageHPad,
+        horizontal: LayoutConstants.pageHPad + 2,
       ),
       child: Row(
         children: [
           Text(label, style: tt.titleMedium),
-          if (noteCount != null && noteCount! > 0) ...[            const SizedBox(width: 8),
+          if (noteCount != null && noteCount! > 0) ...[
+            const SizedBox(width: 8),
             CountBadge(count: noteCount!),
           ],
         ],
@@ -47,15 +55,23 @@ class CountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final nc = Theme.of(context).extension<NoteColors>();
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
+        color:
+            nc?.badgeBackground ?? Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: nc?.columnBorder ?? Theme.of(context).dividerColor,
+        ),
       ),
       child: Text(
         '$count',
-        style: Theme.of(context).textTheme.labelSmall,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: nc?.badgeForeground,
+        ),
       ),
     );
   }

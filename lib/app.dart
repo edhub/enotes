@@ -82,12 +82,8 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
       title: 'eNotes',
       debugShowCheckedModeBanner: false,
       scaffoldMessengerKey: _messengerKey,
-      theme: AppTheme.light().copyWith(
-        extensions: const [NoteColors.light],
-      ),
-      darkTheme: AppTheme.dark().copyWith(
-        extensions: const [NoteColors.dark],
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       home: const TimelineKanbanView(),
     );

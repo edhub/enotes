@@ -33,53 +33,80 @@ class _TrashColumnState extends ConsumerState<TrashColumn> {
   @override
   Widget build(BuildContext context) {
     final notes = ref.watch(notesProvider.select((s) => s.trashedNotes));
+    final nc = Theme.of(context).extension<NoteColors>();
+    final borderColor = nc?.columnBorder ?? Theme.of(context).dividerColor;
+    final columnSurface =
+        nc?.columnSurface ?? Theme.of(context).colorScheme.surface;
+
     return SizedBox(
       width: LayoutConstants.trashColumnWidth,
       height: widget.availableHeight,
-      child: Column(
-        children: [
-          _TrashHeader(
-            count: notes.length,
-            onEmptyTrash: notes.isEmpty
-                ? null
-                : ref.read(notesProvider.notifier).emptyTrash,
-          ),
-          Expanded(
-            child: CustomScrollView(
-              controller: _scrollController,
-              slivers: [
-                if (notes.isEmpty)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _EmptyTrashState(),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.only(
-                      top: LayoutConstants.pageVPad,
-                      bottom: LayoutConstants.pageVPad * 4,
-                    ),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, i) => Padding(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: columnSurface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black.withValues(alpha: 0.16)
+                  : Colors.black.withValues(alpha: 0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Column(
+            children: [
+              _TrashHeader(
+                count: notes.length,
+                onEmptyTrash: notes.isEmpty
+                    ? null
+                    : ref.read(notesProvider.notifier).emptyTrash,
+              ),
+              Expanded(
+                child: ColoredBox(
+                  color: columnSurface,
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    slivers: [
+                      if (notes.isEmpty)
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _EmptyTrashState(),
+                        )
+                      else
+                        SliverPadding(
                           padding: const EdgeInsets.only(
-                            left: LayoutConstants.pageHPad,
-                            right: LayoutConstants.pageHPad,
-                            bottom: LayoutConstants.cardMarginBottom,
+                            top: LayoutConstants.pageVPad,
+                            bottom: LayoutConstants.pageVPad * 4,
                           ),
-                          child: TrashNoteCard(
-                            key: ValueKey(notes[i].id),
-                            note: notes[i],
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, i) => Padding(
+                                padding: const EdgeInsets.only(
+                                  left: LayoutConstants.pageHPad,
+                                  right: LayoutConstants.pageHPad,
+                                  bottom: LayoutConstants.cardMarginBottom,
+                                ),
+                                child: TrashNoteCard(
+                                  key: ValueKey(notes[i].id),
+                                  note: notes[i],
+                                ),
+                              ),
+                              childCount: notes.length,
+                            ),
                           ),
                         ),
-                        childCount: notes.length,
-                      ),
-                    ),
+                    ],
                   ),
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -97,12 +124,20 @@ class _TrashHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final nc = Theme.of(context).extension<NoteColors>();
     final tt = Theme.of(context).textTheme;
+    final destructive = nc?.destructive ?? Colors.red.shade400;
 
     return Container(
       height: LayoutConstants.columnHeaderHeight,
-      color: nc?.columnHeader ?? Theme.of(context).colorScheme.surface,
+      decoration: BoxDecoration(
+        color: nc?.columnHeader ?? Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: nc?.columnBorder ?? Theme.of(context).dividerColor,
+          ),
+        ),
+      ),
       padding: const EdgeInsets.symmetric(
-        horizontal: LayoutConstants.pageHPad,
+        horizontal: LayoutConstants.pageHPad + 2,
       ),
       child: Row(
         children: [
@@ -111,7 +146,7 @@ class _TrashHeader extends StatelessWidget {
             child: Icon(
               Icons.delete_outline_rounded,
               size: 18,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: destructive,
             ),
           ),
           Text('Recently Deleted', style: tt.titleMedium),
@@ -124,13 +159,21 @@ class _TrashHeader extends StatelessWidget {
             TextButton(
               onPressed: onEmptyTrash,
               style: TextButton.styleFrom(
-                foregroundColor: Colors.red.shade400,
+                foregroundColor: destructive,
+                backgroundColor: nc?.destructiveSoft,
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                  side: BorderSide(color: destructive.withValues(alpha: 0.24)),
+                ),
               ),
-              child: const Text('Empty', style: TextStyle(fontSize: 12)),
+              child: const Text(
+                'Empty',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
             ),
         ],
       ),
@@ -145,17 +188,25 @@ class _EmptyTrashState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final nc = Theme.of(context).extension<NoteColors>();
     final secondary = Theme.of(context).textTheme.labelSmall?.color;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.delete_outline_rounded, size: 40, color: secondary),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: nc?.destructiveSoft,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.delete_outline_rounded, size: 28, color: nc?.destructive ?? secondary),
+          ),
           const SizedBox(height: 12),
           Text(
             'No deleted notes.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelSmall,
+            style: Theme.of(context).textTheme.labelMedium,
           ),
         ],
       ),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
+import '../../../core/theme/app_theme.dart';
 import '../providers/notes_provider.dart';
 import '../providers/search_provider.dart';
 import '../services/export_service.dart';
@@ -241,6 +242,8 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
   }
 
   Widget _buildJumpButton() {
+    final nc = Theme.of(context).extension<NoteColors>();
+
     return Positioned(
       left: 24,
       bottom: 24,
@@ -252,6 +255,15 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
           child: FloatingActionButton.small(
             heroTag: 'jumpToToday',
             tooltip: 'Back to Today',
+            backgroundColor:
+                nc?.controlSurface ?? Theme.of(context).floatingActionButtonTheme.backgroundColor,
+            foregroundColor: Theme.of(context).colorScheme.primary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: nc?.searchBarBorder ?? Theme.of(context).dividerColor,
+              ),
+            ),
             onPressed: _jumpToStart,
             child: const Icon(Icons.first_page_rounded),
           ),
@@ -278,43 +290,71 @@ class _DataMenuButtonState extends ConsumerState<_DataMenuButton> {
 
   @override
   Widget build(BuildContext context) {
+    final nc = Theme.of(context).extension<NoteColors>();
+
     return Positioned(
       right: 24,
       top: 16,
-      child: PopupMenuButton<_MenuAction>(
-        icon: const Icon(Icons.more_vert),
-        tooltip: 'Import / Export',
-        onSelected: _handleAction,
-        itemBuilder: (_) => const [
-          PopupMenuItem(
-            value: _MenuAction.exportJson,
-            child: ListTile(
-              leading: Icon(Icons.backup_outlined),
-              title: Text('Export JSON (full backup)'),
-              contentPadding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: nc?.controlSurface ?? Theme.of(context).cardTheme.color,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: nc?.searchBarBorder ?? Theme.of(context).dividerColor,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black.withValues(alpha: 0.16)
+                  : Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: PopupMenuButton<_MenuAction>(
+          icon: const Icon(Icons.more_horiz_rounded),
+          tooltip: 'Import / Export',
+          onSelected: _handleAction,
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            padding: const EdgeInsets.all(8),
+            minimumSize: const Size(36, 36),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-          PopupMenuItem(
-            value: _MenuAction.exportMarkdown,
-            child: ListTile(
-              leading: Icon(Icons.description_outlined),
-              title: Text('Export Markdown (plain text)'),
-              contentPadding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
+          itemBuilder: (_) => const [
+            PopupMenuItem(
+              value: _MenuAction.exportJson,
+              child: ListTile(
+                leading: Icon(Icons.backup_outlined),
+                title: Text('Export JSON (full backup)'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
             ),
-          ),
-          PopupMenuDivider(),
-          PopupMenuItem(
-            value: _MenuAction.importJson,
-            child: ListTile(
-              leading: Icon(Icons.restore_outlined),
-              title: Text('Import JSON…'),
-              contentPadding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
+            PopupMenuItem(
+              value: _MenuAction.exportMarkdown,
+              child: ListTile(
+                leading: Icon(Icons.description_outlined),
+                title: Text('Export Markdown (plain text)'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
             ),
-          ),
-        ],
+            PopupMenuDivider(),
+            PopupMenuItem(
+              value: _MenuAction.importJson,
+              child: ListTile(
+                leading: Icon(Icons.restore_outlined),
+                title: Text('Import JSON…'),
+                contentPadding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../models/note.dart';
 import '../providers/notes_provider.dart';
@@ -22,11 +23,19 @@ class _TrashNoteCardState extends ConsumerState<TrashNoteCard> {
 
   @override
   Widget build(BuildContext context) {
+    final nc = Theme.of(context).extension<NoteColors>();
+    final mutedText = Theme.of(context)
+        .textTheme
+        .bodyMedium
+        ?.color
+        ?.withValues(alpha: 0.68);
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: NoteCardContainer(
         hovered: _hovered,
+        backgroundColor: Theme.of(context).cardTheme.color?.withValues(alpha: 0.94),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -51,15 +60,18 @@ class _TrashNoteCardState extends ConsumerState<TrashNoteCard> {
                   icon: Icons.restore_rounded,
                   tooltip: 'Restore',
                   color: Theme.of(context).colorScheme.primary,
+                  backgroundColor:
+                      (nc?.hoverTint ?? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)),
                   onTap: () => ref
                       .read(notesProvider.notifier)
                       .restoreNote(widget.note.id),
                 ),
-                const SizedBox(width: 2),
+                const SizedBox(width: 6),
                 _TrashAction(
                   icon: Icons.delete_forever_rounded,
                   tooltip: 'Delete Forever',
-                  color: Colors.red.shade400,
+                  color: nc?.destructive ?? Colors.red.shade400,
+                  backgroundColor: nc?.destructiveSoft ?? Colors.red.withValues(alpha: 0.12),
                   onTap: () => ref
                       .read(notesProvider.notifier)
                       .permanentlyDeleteNote(widget.note.id),
@@ -71,13 +83,9 @@ class _TrashNoteCardState extends ConsumerState<TrashNoteCard> {
               SelectableText(
                 widget.note.content,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.color
-                          ?.withValues(alpha: 0.6),
-                      height: 1.55,
-                    ),
+                  color: mutedText,
+                  height: 1.58,
+                ),
               ),
             ],
           ],
@@ -92,24 +100,30 @@ class _TrashAction extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.color,
+    required this.backgroundColor,
     required this.onTap,
   });
 
   final IconData icon;
   final String tooltip;
   final Color color;
+  final Color backgroundColor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(5),
-          child: Icon(icon, size: 15, color: color),
+      child: Material(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Icon(icon, size: 15, color: color),
+          ),
         ),
       ),
     );

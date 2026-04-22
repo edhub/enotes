@@ -16,7 +16,7 @@ abstract final class LayoutConstants {
 
   // Cards
   static const double cardPadding = 12;
-  static const double cardBorderRadius = 12;
+  static const double cardBorderRadius = 14;
   static const double cardMarginBottom = 16;
 
   /// Number of permanent draft slots (always present, like tabs).
