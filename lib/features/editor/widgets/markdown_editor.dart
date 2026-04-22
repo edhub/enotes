@@ -16,12 +16,16 @@ class MarkdownEditor extends StatelessWidget {
     required this.focusNode,
     this.hint,
     this.minLines,
+    this.style,
+    this.hintStyle,
   });
 
   final MarkdownController controller;
   final FocusNode focusNode;
   final String? hint;
   final int? minLines;
+  final TextStyle? style;
+  final TextStyle? hintStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -29,15 +33,22 @@ class MarkdownEditor extends StatelessWidget {
     final textColor = nc?.editorText;
     final hintColor = nc?.editorHint;
     final cursorColor = nc?.editorCursor ?? Theme.of(context).colorScheme.primary;
+    final baseStyle = TextStyle(
+      fontSize: 14,
+      height: 1.64,
+      letterSpacing: 0.05,
+      color: textColor,
+    );
 
     return TextField(
       controller: controller,
       focusNode: focusNode,
+      textAlignVertical: TextAlignVertical.top,
       // Let TextField expand naturally based on content.
       // minLines ensures a minimum visual height, maxLines allows unlimited growth.
       minLines: minLines ?? 1,
       maxLines: null,
-      style: TextStyle(fontSize: 14, height: 1.6, color: textColor),
+      style: baseStyle.merge(style),
       cursorColor: cursorColor,
       cursorWidth: 1.5,
       decoration: InputDecoration(
@@ -45,7 +56,10 @@ class MarkdownEditor extends StatelessWidget {
         isDense: true,
         contentPadding: EdgeInsets.zero,
         hintText: hint,
-        hintStyle: TextStyle(fontSize: 14, height: 1.6, color: hintColor),
+        hintStyle: baseStyle.copyWith(
+          color: hintColor,
+          fontWeight: FontWeight.w400,
+        ).merge(hintStyle),
       ),
     );
   }

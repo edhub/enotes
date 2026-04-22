@@ -108,7 +108,7 @@ class NoteCardContainer extends StatelessWidget {
         border: Border.all(color: borderColor, width: focused ? 1.15 : 1.0),
         boxShadow: shadow,
       ),
-      padding: padding ?? const EdgeInsets.all(LayoutConstants.cardPadding),
+      padding: padding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       child: child,
     );
   }

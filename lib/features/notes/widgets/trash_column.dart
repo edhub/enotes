@@ -125,6 +125,7 @@ class _TrashHeader extends StatelessWidget {
     final nc = Theme.of(context).extension<NoteColors>();
     final tt = Theme.of(context).textTheme;
     final destructive = nc?.destructive ?? Colors.red.shade400;
+    final mutedDestructive = destructive.withValues(alpha: 0.82);
 
     return Container(
       height: LayoutConstants.columnHeaderHeight,
@@ -146,7 +147,7 @@ class _TrashHeader extends StatelessWidget {
             child: Icon(
               Icons.delete_outline_rounded,
               size: 18,
-              color: destructive,
+              color: mutedDestructive,
             ),
           ),
           Text('Recently Deleted', style: tt.titleMedium),
@@ -159,15 +160,15 @@ class _TrashHeader extends StatelessWidget {
             TextButton(
               onPressed: onEmptyTrash,
               style: TextButton.styleFrom(
-                foregroundColor: destructive,
-                backgroundColor: nc?.destructiveSoft,
+                foregroundColor: mutedDestructive,
+                backgroundColor: Colors.transparent,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
-                  side: BorderSide(color: destructive.withValues(alpha: 0.24)),
+                  side: BorderSide(color: mutedDestructive.withValues(alpha: 0.24)),
                 ),
               ),
               child: const Text(
@@ -200,7 +201,11 @@ class _EmptyTrashState extends StatelessWidget {
               color: nc?.destructiveSoft,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.delete_outline_rounded, size: 28, color: nc?.destructive ?? secondary),
+            child: Icon(
+              Icons.delete_outline_rounded,
+              size: 28,
+              color: (nc?.destructive ?? secondary)?.withValues(alpha: 0.86),
+            ),
           ),
           const SizedBox(height: 12),
           Text(

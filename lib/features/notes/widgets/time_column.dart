@@ -94,6 +94,7 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
               ColumnHeader(
                 label: widget.data.label,
                 noteCount: widget.data.totalCount,
+                emphasized: isToday,
               ),
               Expanded(
                 child: ColoredBox(
@@ -299,13 +300,24 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
 
   @override
   Widget build(BuildContext context) {
+    final nc = Theme.of(context).extension<NoteColors>();
+    final surface = Color.alphaBlend(
+      Theme.of(context).colorScheme.primary.withValues(alpha: 0.035),
+      nc?.columnSurface ?? Theme.of(context).cardTheme.color ?? Colors.white,
+    );
+
     return NoteCardContainer(
       focused: _focused,
-      minHeight: 52,
+      backgroundColor: surface,
+      minHeight: 56,
       child: MarkdownEditor(
         controller: _controller,
         focusNode: _focusNode,
-        hint: 'New note…',
+        hint: 'Capture what matters next…',
+        style: const TextStyle(
+          fontSize: 14.1,
+          height: 1.62,
+        ),
       ),
     );
   }

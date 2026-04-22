@@ -36,6 +36,7 @@ class _TrashNoteCardState extends ConsumerState<TrashNoteCard> {
       child: NoteCardContainer(
         hovered: _hovered,
         backgroundColor: Theme.of(context).cardTheme.color?.withValues(alpha: 0.94),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -61,7 +62,7 @@ class _TrashNoteCardState extends ConsumerState<TrashNoteCard> {
                   tooltip: 'Restore',
                   color: Theme.of(context).colorScheme.primary,
                   backgroundColor:
-                      (nc?.hoverTint ?? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)),
+                      (nc?.hoverTint ?? Theme.of(context).colorScheme.primary.withValues(alpha: 0.10)),
                   onTap: () => ref
                       .read(notesProvider.notifier)
                       .restoreNote(widget.note.id),
@@ -71,7 +72,7 @@ class _TrashNoteCardState extends ConsumerState<TrashNoteCard> {
                   icon: Icons.delete_forever_rounded,
                   tooltip: 'Delete Forever',
                   color: nc?.destructive ?? Colors.red.shade400,
-                  backgroundColor: nc?.destructiveSoft ?? Colors.red.withValues(alpha: 0.12),
+                  backgroundColor: nc?.destructiveSoft ?? Colors.red.withValues(alpha: 0.10),
                   onTap: () => ref
                       .read(notesProvider.notifier)
                       .permanentlyDeleteNote(widget.note.id),

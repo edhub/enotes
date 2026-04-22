@@ -76,6 +76,10 @@ class DraftColumn extends ConsumerWidget {
                 ),
               ),
               Container(
+                height: 1,
+                color: borderColor.withValues(alpha: 0.7),
+              ),
+              Container(
                 color: headerBg,
                 child: _ChromeTabBar(
                   count: drafts.length,
@@ -203,6 +207,14 @@ class _ChromeTabState extends State<_ChromeTab> {
   bool _hovered = false;
 
   @override
+  void didUpdateWidget(covariant _ChromeTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive && _hovered) {
+      _hovered = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final nc = Theme.of(context).extension<NoteColors>();
@@ -220,6 +232,13 @@ class _ChromeTabState extends State<_ChromeTab> {
             left: BorderSide(color: widget.borderColor),
             right: BorderSide(color: widget.borderColor),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: scheme.primary.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
         ),
         alignment: Alignment.center,
         child: Text(

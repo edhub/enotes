@@ -147,7 +147,7 @@ class _NoteCardState extends ConsumerState<NoteCard> {
 
   // ── Build ──────────────────────────────────────────────────────────────────
 
-  static const _minLineHeight = 14.0 * 1.6;
+  static const _minLineHeight = 14.0 * 1.64;
   static const _defaultMinLines = 1;
 
   @override
@@ -156,16 +156,12 @@ class _NoteCardState extends ConsumerState<NoteCard> {
     final bgColor = widget.isDraftView
         ? (nc?.draftCardBackground ?? Theme.of(context).cardTheme.color)
         : null;
-
     final minLines = widget.minLines ?? _defaultMinLines;
     final minContentHeight = minLines * _minLineHeight;
     final minCardHeight =
         widget.minHeight ??
         (minContentHeight + LayoutConstants.cardPadding * 2);
 
-    // The info button sits in a reserved gutter on the right of the editor
-    // (instead of being absolutely positioned on top of it). This guarantees
-    // the cursor / text never collide with the button — even on long lines.
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -174,19 +170,23 @@ class _NoteCardState extends ConsumerState<NoteCard> {
         hovered: _hovered,
         backgroundColor: bgColor,
         minHeight: minCardHeight,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Expanded(
-              child: MarkdownEditor(
-                controller: _controller,
-                focusNode: _focusNode,
-                hint: 'Start writing…',
-                minLines: minLines,
+            MarkdownEditor(
+              controller: _controller,
+              focusNode: _focusNode,
+              hint: widget.isDraftView ? 'Capture an idea…' : 'Start writing…',
+              minLines: minLines,
+              style: TextStyle(
+                fontSize: widget.isDraftView ? 14.2 : 14,
+                height: widget.isDraftView ? 1.66 : 1.64,
+                fontWeight: FontWeight.w400,
               ),
             ),
-            SizedBox(
-              width: _infoGutterWidth,
+            Positioned(
+              top: -7,
+              right: -7,
               child: NoteInfoButton(
                 note: widget.note,
                 isDraftView: widget.isDraftView,
@@ -199,8 +199,4 @@ class _NoteCardState extends ConsumerState<NoteCard> {
       ),
     );
   }
-
-  /// Gutter on the right of the editor that hosts the ⋯ info button.
-  /// Width matches the icon (15) + its 5px padding × 2 + breathing room.
-  static const double _infoGutterWidth = 28;
 }

@@ -256,25 +256,30 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
     return Positioned(
       left: LayoutConstants.pageHPad + 8,
       bottom: LayoutConstants.pageHPad + 8,
-      child: AnimatedOpacity(
-        opacity: _showJumpButton ? 1.0 : 0.0,
+      child: AnimatedSlide(
+        offset: _showJumpButton ? Offset.zero : const Offset(0, 0.08),
         duration: const Duration(milliseconds: 200),
-        child: IgnorePointer(
-          ignoring: !_showJumpButton,
-          child: FloatingActionButton.small(
-            heroTag: 'jumpToToday',
-            tooltip: 'Back to Today',
-            backgroundColor:
-                nc?.controlSurface ?? Theme.of(context).floatingActionButtonTheme.backgroundColor,
-            foregroundColor: Theme.of(context).colorScheme.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(
-                color: nc?.searchBarBorder ?? Theme.of(context).dividerColor,
+        curve: Curves.easeOutCubic,
+        child: AnimatedOpacity(
+          opacity: _showJumpButton ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 200),
+          child: IgnorePointer(
+            ignoring: !_showJumpButton,
+            child: FloatingActionButton.small(
+              heroTag: 'jumpToToday',
+              tooltip: 'Back to Today',
+              backgroundColor:
+                  nc?.controlSurface ?? Theme.of(context).floatingActionButtonTheme.backgroundColor,
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(
+                  color: nc?.searchBarBorder ?? Theme.of(context).dividerColor,
+                ),
               ),
+              onPressed: _jumpToStart,
+              child: const Icon(Icons.first_page_rounded),
             ),
-            onPressed: _jumpToStart,
-            child: const Icon(Icons.first_page_rounded),
           ),
         ),
       ),
@@ -314,10 +319,10 @@ class _DataMenuButtonState extends ConsumerState<_DataMenuButton> {
           boxShadow: [
             BoxShadow(
               color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.black.withValues(alpha: 0.16)
-                  : Colors.black.withValues(alpha: 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+                  ? Colors.black.withValues(alpha: 0.14)
+                  : Colors.black.withValues(alpha: 0.035),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
           ],
         ),

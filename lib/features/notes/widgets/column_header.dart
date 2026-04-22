@@ -9,15 +9,18 @@ class ColumnHeader extends StatelessWidget {
     super.key,
     required this.label,
     this.noteCount,
+    this.emphasized = false,
   });
 
   final String label;
   final int? noteCount;
+  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
     final nc = Theme.of(context).extension<NoteColors>();
     final tt = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
 
     return Container(
       height: LayoutConstants.columnHeaderHeight,
@@ -34,7 +37,13 @@ class ColumnHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(label, style: tt.titleMedium),
+          Text(
+            label,
+            style: tt.titleMedium?.copyWith(
+              color: emphasized ? scheme.primary : null,
+              fontWeight: emphasized ? FontWeight.w700 : FontWeight.w600,
+            ),
+          ),
           if (noteCount != null && noteCount! > 0) ...[
             const SizedBox(width: 8),
             CountBadge(count: noteCount!),
