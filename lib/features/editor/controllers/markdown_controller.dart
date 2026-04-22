@@ -19,15 +19,20 @@ class MarkdownController extends TextEditingController {
   List<String> _cachedTokens = const [];
   TextSpan? _cachedSpan;
 
-  /// Search tokens to highlight. Setting a new value clears the parse cache.
-  /// Does **not** call [notifyListeners] — callers that update this during
-  /// their own build (e.g. [NoteCard]) rely on the enclosing rebuild to
-  /// redraw the [TextField].
+  /// Search tokens to highlight. Setting a new value clears the parse cache
+  /// and notifies listeners so the bound [TextField] redraws.
+  ///
+  /// Call this from a [Ref.listenManual] callback (event-driven) rather than
+  /// from `build()` — mutating controller state during build is a Flutter
+  /// anti-pattern and re-entrant `notifyListeners` would assert.
   set searchTokens(List<String> tokens) {
     if (_tokensEqual(tokens, _cachedTokens)) return;
     _cachedTokens = tokens;
     _cachedSpan = null;
+    notifyListeners();
   }
+
+  List<String> get searchTokens => _cachedTokens;
 
   static bool _tokensEqual(List<String> a, List<String> b) {
     if (a.length != b.length) return false;

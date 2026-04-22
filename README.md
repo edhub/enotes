@@ -22,6 +22,20 @@ Key features:
 - **Import / Export** — JSON full backup and Markdown plain-text export
 - **Dark / Light mode** — follows macOS system preference
 
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Cmd+K` | Focus the new-note composer in the Today column |
+| `Cmd+F` | Focus the search bar (filter all columns) |
+| `Cmd+1` … `Cmd+5` | Switch to draft tab 1–5 and focus its editor |
+| `Cmd+B` | Toggle bold (`*…*`) around the selection |
+| `Cmd+L` | Toggle unordered list (`- `) on selected lines |
+| `Shift+Cmd+L` | Toggle ordered list (`1. `, `2. `…) |
+| `Enter` (in a list / quote line) | Continue the prefix; on an empty list line, terminate it |
+| `ESC` | Unfocus the editor (also clears the search bar) |
+| `Shift + mouse wheel` | Scroll horizontally across columns |
+
 ## Platform
 
 macOS Desktop (primary target). Flutter 3.x, Dart SDK `^3.11.4`.

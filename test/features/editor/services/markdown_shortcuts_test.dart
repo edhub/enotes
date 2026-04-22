@@ -583,4 +583,78 @@ void main() {
       expect(text, '1. first\n2. second\n3. third');
     });
   });
+
+  // ── Enter continuation ──────────────────────────────────────────────────
+
+  group('applyEnterContinuation', () {
+    /// Helper: build a controller with caret at [offset] then call the
+    /// continuation. Returns (newText, newCaret, handled).
+    (String, int, bool) run(String text, int offset) {
+      final c = TextEditingController(text: text)
+        ..selection = _sel(offset);
+      final handled = MarkdownShortcuts.applyEnterContinuation(c);
+      return (c.text, c.selection.baseOffset, handled);
+    }
+
+    test('continues unordered list with the same bullet', () {
+      final (text, caret, ok) = run('- first', 7);
+      expect(ok, isTrue);
+      expect(text, '- first\n- ');
+      expect(caret, '- first\n- '.length);
+    });
+
+    test('continues ordered list incrementing the number', () {
+      final (text, caret, ok) = run('1. first', 8);
+      expect(ok, isTrue);
+      expect(text, '1. first\n2. ');
+      expect(caret, '1. first\n2. '.length);
+    });
+
+    test('continues quote with the same > marker', () {
+      final (text, _, ok) = run('> hello', 7);
+      expect(ok, isTrue);
+      expect(text, '> hello\n> ');
+    });
+
+    test('preserves leading indentation', () {
+      final (text, _, ok) = run('    - nested', 12);
+      expect(ok, isTrue);
+      expect(text, '    - nested\n    - ');
+    });
+
+    test('terminates list when content is empty', () {
+      final (text, caret, ok) = run('- ', 2);
+      expect(ok, isTrue);
+      expect(text, '');
+      expect(caret, 0);
+    });
+
+    test('terminates indented list preserving indent', () {
+      final (text, caret, ok) = run('    - ', 6);
+      expect(ok, isTrue);
+      expect(text, '    ');
+      expect(caret, 4);
+    });
+
+    test('does nothing on plain text', () {
+      final (text, caret, ok) = run('plain text', 10);
+      expect(ok, isFalse);
+      expect(text, 'plain text');
+      expect(caret, 10);
+    });
+
+    test('does nothing when selection is not collapsed', () {
+      final c = TextEditingController(text: '- item')..selection = _range(2, 6);
+      expect(MarkdownShortcuts.applyEnterContinuation(c), isFalse);
+    });
+
+    test('inserts continuation in the middle of a list line (splits content)',
+        () {
+      // Caret in the middle of "- hello world" between "hello" and " world".
+      final (text, caret, ok) = run('- hello world', 7);
+      expect(ok, isTrue);
+      expect(text, '- hello\n-  world');
+      expect(caret, '- hello\n- '.length);
+    });
+  });
 }

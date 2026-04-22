@@ -35,13 +35,20 @@ class TimeColumn extends ConsumerStatefulWidget {
 
 class _TimeColumnState extends ConsumerState<TimeColumn> {
   final _scrollController = ScrollController();
-  late final Set<String> _seenNoteIds;
+
+  /// Wall-clock instant captured when this column entered the tree.
+  /// Notes whose [Note.createdAt] is strictly after this point are
+  /// considered "freshly added" and play the slide-in animation.
+  ///
+  /// This avoids the cross-column tracking the previous Set-based
+  /// implementation needed: each column only cares about "did this note
+  /// appear after I was built?", a purely local question.
+  late final DateTime _mountedAt;
 
   @override
   void initState() {
     super.initState();
-    final allNotes = ref.read(notesProvider).notes;
-    _seenNoteIds = allNotes.map((n) => n.id).toSet();
+    _mountedAt = DateTime.now().toUtc();
   }
 
   @override
@@ -113,10 +120,13 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
       delegate: SliverChildBuilderDelegate(
         (context, i) {
           final note = col.notes[i];
-          final isNew = !_seenNoteIds.contains(note.id);
-          if (isNew) {
-            _seenNoteIds.add(note.id);
-          }
+          // "New" = created after this column mounted *and* within the last
+          // few seconds. The second clause prevents the animation from
+          // replaying when the user scrolls a long-since-added note in and
+          // out of the viewport (SliverList disposes off-screen state).
+          final age = DateTime.now().toUtc().difference(note.createdAt);
+          final isNew =
+              note.createdAt.isAfter(_mountedAt) && age.inSeconds < 2;
 
           return _SlideInNewItem(
             key: ValueKey('slide-${note.id}'),
@@ -165,16 +175,32 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
   late final FocusNode _focusNode;
   bool _focused = false;
 
-  /// Shadow of the last seen [NotesProvider.newNoteFocusRequest] value so we
-  /// can detect when it increments and trigger focus.
-  int _lastFocusRequest = 0;
-
   @override
   void initState() {
     super.initState();
     _controller = MarkdownController();
     _focusNode = FocusNode(onKeyEvent: _handleKeyEvent)
       ..addListener(_onFocusChanged);
+
+    // React to Cmd+K focus requests via an event listener (event-driven);
+    // doing this in build() forces a per-frame compare and is fragile.
+    ref.listenManual<int>(
+      notesProvider.select((s) => s.newNoteFocusRequest),
+      (prev, next) {
+        if (prev == null || next == prev) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (widget.scrollController.hasClients) {
+            widget.scrollController.animateTo(
+              0,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+            );
+          }
+          _focusNode.requestFocus();
+        });
+      },
+    );
   }
 
   @override
@@ -212,23 +238,6 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
 
   @override
   Widget build(BuildContext context) {
-    // Detect when Cmd+K increments the focus counter and grab focus.
-    final req = ref.watch(notesProvider.select((s) => s.newNoteFocusRequest));
-    if (req > 0 && req != _lastFocusRequest) {
-      _lastFocusRequest = req;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (widget.scrollController.hasClients) {
-          widget.scrollController.animateTo(
-            0,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-          );
-        }
-        _focusNode.requestFocus();
-      });
-    }
-
     return NoteCardContainer(
       focused: _focused,
       minHeight: 52,

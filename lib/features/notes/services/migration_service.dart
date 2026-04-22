@@ -41,6 +41,9 @@ class MigrationService {
       log('MigrationService: ✓ ${notes.length} notes migrated, '
           'JSON renamed to .migrated');
     } catch (e, st) {
+      // Do not propagate: a failed migration must never block app startup.
+      // The legacy JSON file is preserved (we never delete it on failure),
+      // so the user can re-attempt by relaunching after a fix.
       log('MigrationService: failed: $e', error: e, stackTrace: st);
     }
   }

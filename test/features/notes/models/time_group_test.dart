@@ -40,16 +40,6 @@ void main() {
     });
   });
 
-  group('TimeGroupHelper.groupFromKey', () {
-    test('maps known keys correctly', () {
-      expect(TimeGroupHelper.groupFromKey('today'), TimeGroup.today);
-      expect(TimeGroupHelper.groupFromKey('yesterday'), TimeGroup.yesterday);
-      expect(TimeGroupHelper.groupFromKey('this_week'), TimeGroup.thisWeek);
-      expect(TimeGroupHelper.groupFromKey('last_week'), TimeGroup.lastWeek);
-      expect(TimeGroupHelper.groupFromKey('week_2026_3_16'), TimeGroup.isoWeek);
-    });
-  });
-
   group('TimeGroupHelper.labelFromKey', () {
     test('known keys return readable labels', () {
       expect(TimeGroupHelper.labelFromKey('today'), 'Today');

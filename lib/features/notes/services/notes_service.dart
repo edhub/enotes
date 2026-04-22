@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
 
@@ -16,10 +17,22 @@ import '../models/note.dart';
 ///   Debug/Profile  → `enotes_dev.db`
 ///
 /// WAL mode is enabled for better write performance and crash safety.
+///
+/// Mutations ([saveNotes], [upsertNotes], [deleteNotesByIds]) **rethrow**
+/// on failure after logging — callers (typically [NotesNotifier]) catch
+/// the error and surface it via [saveErrorProvider]. Read-only [loadNotes]
+/// returns `[]` on failure (no caller can usefully react beyond logging).
+///
+/// Each mutation yields the event loop with `Future(() ...)` so a
+/// long-running write (rare, but possible on first sync after large imports)
+/// does not block the next frame.
 class NotesService {
   Database? _db;
 
   /// Opens (or creates) the SQLite database and ensures the schema exists.
+  ///
+  /// Throws on failure — `main()` should catch this and present a startup
+  /// error screen rather than launching the app with no persistence.
   Future<void> init() async {
     final support = await getApplicationSupportDirectory();
     if (!Directory(support.path).existsSync()) {
@@ -45,7 +58,8 @@ class NotesService {
     ''');
   }
 
-  /// Loads all notes from the database. Returns an empty list on any error.
+  /// Loads all notes from the database. Returns an empty list on any error
+  /// (no caller can recover beyond what's logged).
   Future<List<Note>> loadNotes() async {
     try {
       return _db!.select('SELECT * FROM notes').map(_rowToNote).toList();
@@ -62,63 +76,82 @@ class NotesService {
   ///
   /// Only used for full imports. For incremental saves, prefer
   /// [upsertNotes] + [deleteNotesByIds].
-  Future<void> saveNotes(List<Note> notes) async {
-    final db = _db;
-    if (db == null) return;
-    try {
-      db.execute('BEGIN');
-      db.execute('DELETE FROM notes');
-      final stmt = db.prepare(_insertSql);
-      for (final n in notes) {
-        stmt.execute(_noteParams(n));
+  Future<void> saveNotes(List<Note> notes) {
+    return Future(() {
+      final db = _requireDb();
+      try {
+        db.execute('BEGIN');
+        db.execute('DELETE FROM notes');
+        final stmt = db.prepare(_insertSql);
+        try {
+          for (final n in notes) {
+            stmt.execute(_noteParams(n));
+          }
+        } finally {
+          stmt.dispose();
+        }
+        db.execute('COMMIT');
+      } catch (e, st) {
+        _safeRollback(db);
+        log('NotesService.saveNotes failed: $e', error: e, stackTrace: st);
+        rethrow;
       }
-      stmt.dispose();
-      db.execute('COMMIT');
-    } catch (e, st) {
-      db.execute('ROLLBACK');
-      log('NotesService.saveNotes failed: $e', error: e, stackTrace: st);
-    }
+    });
   }
 
   /// Incrementally inserts or updates [notes] without touching other rows.
   ///
   /// Uses `INSERT OR REPLACE` so both new and modified notes are handled
   /// in a single statement. Wrapped in a transaction for atomicity.
-  Future<void> upsertNotes(List<Note> notes) async {
-    if (notes.isEmpty) return;
-    final db = _db;
-    if (db == null) return;
-    try {
-      db.execute('BEGIN');
-      final stmt = db.prepare(_insertOrReplaceSql);
-      for (final n in notes) {
-        stmt.execute(_noteParams(n));
+  Future<void> upsertNotes(List<Note> notes) {
+    if (notes.isEmpty) return Future.value();
+    return Future(() {
+      final db = _requireDb();
+      try {
+        db.execute('BEGIN');
+        final stmt = db.prepare(_insertOrReplaceSql);
+        try {
+          for (final n in notes) {
+            stmt.execute(_noteParams(n));
+          }
+        } finally {
+          stmt.dispose();
+        }
+        db.execute('COMMIT');
+      } catch (e, st) {
+        _safeRollback(db);
+        log('NotesService.upsertNotes failed: $e', error: e, stackTrace: st);
+        rethrow;
       }
-      stmt.dispose();
-      db.execute('COMMIT');
-    } catch (e, st) {
-      db.execute('ROLLBACK');
-      log('NotesService.upsertNotes failed: $e', error: e, stackTrace: st);
-    }
+    });
   }
 
   /// Permanently removes notes with the given [ids] from the database.
-  Future<void> deleteNotesByIds(Set<String> ids) async {
-    if (ids.isEmpty) return;
-    final db = _db;
-    if (db == null) return;
-    try {
-      db.execute('BEGIN');
-      final stmt = db.prepare('DELETE FROM notes WHERE id = ?');
-      for (final id in ids) {
-        stmt.execute([id]);
+  Future<void> deleteNotesByIds(Set<String> ids) {
+    if (ids.isEmpty) return Future.value();
+    return Future(() {
+      final db = _requireDb();
+      try {
+        db.execute('BEGIN');
+        final stmt = db.prepare('DELETE FROM notes WHERE id = ?');
+        try {
+          for (final id in ids) {
+            stmt.execute([id]);
+          }
+        } finally {
+          stmt.dispose();
+        }
+        db.execute('COMMIT');
+      } catch (e, st) {
+        _safeRollback(db);
+        log(
+          'NotesService.deleteNotesByIds failed: $e',
+          error: e,
+          stackTrace: st,
+        );
+        rethrow;
       }
-      stmt.dispose();
-      db.execute('COMMIT');
-    } catch (e, st) {
-      db.execute('ROLLBACK');
-      log('NotesService.deleteNotesByIds failed: $e', error: e, stackTrace: st);
-    }
+    });
   }
 
   /// Closes the database connection. Safe to call multiple times.
@@ -128,6 +161,24 @@ class NotesService {
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
+
+  Database _requireDb() {
+    final db = _db;
+    if (db == null) {
+      throw StateError(
+        'NotesService used before init() — call init() in main().',
+      );
+    }
+    return db;
+  }
+
+  /// ROLLBACK can itself throw if the DB is in an unusable state; never let
+  /// that mask the original error.
+  void _safeRollback(Database db) {
+    try {
+      db.execute('ROLLBACK');
+    } catch (_) {/* ignore */}
+  }
 
   static const _insertSql =
       'INSERT INTO notes (id, content, created_at, updated_at, is_draft, deleted_at) '

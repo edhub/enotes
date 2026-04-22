@@ -24,14 +24,28 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
 
-  /// Shadow of the last seen [SearchState.focusRequest] value.
-  int _lastFocusRequest = 0;
-
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
     _focusNode = FocusNode(onKeyEvent: _handleKey);
+
+    // React to Cmd+F focus requests via an event listener.
+    ref.listenManual<int>(
+      searchQueryProvider.select((s) => s.focusRequest),
+      (prev, next) {
+        if (prev == null || next == prev) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _focusNode.requestFocus();
+          // Select all existing text so the user can immediately replace it.
+          _controller.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: _controller.text.length,
+          );
+        });
+      },
+    );
   }
 
   @override
@@ -67,22 +81,8 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final state = ref.watch(searchQueryProvider);
-    final hasQuery = state.query.isNotEmpty;
-
-    // Detect Cmd+F focus request and grab focus.
-    if (state.focusRequest > 0 && state.focusRequest != _lastFocusRequest) {
-      _lastFocusRequest = state.focusRequest;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _focusNode.requestFocus();
-        // Select all existing text so the user can immediately replace it.
-        _controller.selection = TextSelection(
-          baseOffset: 0,
-          extentOffset: _controller.text.length,
-        );
-      });
-    }
+    final hasQuery =
+        ref.watch(searchQueryProvider.select((s) => s.query.isNotEmpty));
 
     final nc = Theme.of(context).extension<NoteColors>();
     final textPrimary = Theme.of(context).textTheme.bodyMedium?.color;

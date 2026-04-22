@@ -68,6 +68,11 @@ class MarkdownParser {
 
   static const _mono = 'monospace';
 
+  /// Heading sizes are intentionally kept close to body text (14 px).
+  /// Rationale: notes in a Timeline Kanban column are short, dense, and
+  /// glanceable — a large H1 would dominate the column and break visual
+  /// rhythm between cards. Headings are emphasised via colour + weight
+  /// instead of size. Do **not** scale these up.
   static const _headingSizes = [15.0, 15.0, 15.0, 14.0, 14.0, 14.0];
 
   /// Build a [TextSpan] tree from [text].

@@ -6,6 +6,17 @@ install := "/Applications/" + app + ".app"
 default:
     @just --list
 
+# 静态检查（应 0 issues）
+analyze:
+    flutter analyze
+
+# 跑全部单元测试
+test:
+    flutter test
+
+# 一键检查：analyze + test，提交前跑
+check: analyze test
+
 # 构建 release 包
 build:
     flutter build macos --release

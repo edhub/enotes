@@ -465,7 +465,7 @@ void main() {
     test('--- rule has punct colour (light)', () {
       expect(
         _flat(_build('---', isDark: false)).firstWhere((e) => e.text == '---').style?.color,
-        const Color(0xFFBBBEC5),
+        const Color(0xFFD1D1D1),
       );
     });
 

@@ -22,6 +22,10 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   // down (ref may no longer be usable at that point).
   late final NotesService _service;
 
+  // ScaffoldMessenger key lets us show SnackBars from `ref.listen` callbacks
+  // without needing a BuildContext below the MaterialApp boundary.
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
   @override
   void initState() {
     super.initState();
@@ -36,10 +40,16 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  /// Flush pending saves when the app goes to background or is about to close.
+  /// Flush pending saves when the app is hidden, paused, or about to close.
+  ///
+  /// We deliberately skip [AppLifecycleState.inactive] — on macOS it fires
+  /// every time the window loses focus (e.g. ⌘-Tab to another app), which is
+  /// far too aggressive for a save-on-blur model and would force a flush
+  /// every few seconds during normal multitasking.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive ||
+    if (state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       ref.read(notesProvider.notifier).flushSave();
     }
@@ -47,9 +57,31 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Surface persistence errors as non-blocking SnackBars. We listen here
+    // rather than inside the home widget so the message is shown regardless
+    // of which screen is currently visible.
+    ref.listen<String?>(saveErrorProvider, (prev, next) {
+      if (next == null || next == prev) return;
+      _messengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text(next),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red.shade700,
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            textColor: Colors.white,
+            onPressed: () =>
+                ref.read(saveErrorProvider.notifier).clear(),
+          ),
+        ),
+      );
+    });
+
     return MaterialApp(
       title: 'eNotes',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: _messengerKey,
       theme: AppTheme.light().copyWith(
         extensions: const [NoteColors.light],
       ),

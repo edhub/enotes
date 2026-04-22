@@ -14,9 +14,10 @@ class MarkdownShortcuts {
 
   /// Handles keyboard shortcuts for a Markdown editor.
   ///
-  /// Processes ESC (unfocus), Cmd+B (bold), Cmd+L (unordered list),
-  /// Shift+Cmd+L (ordered list). Returns [KeyEventResult.handled] if
-  /// a shortcut was matched, otherwise [KeyEventResult.ignored].
+  /// Processes ESC (unfocus), Enter (list/quote continuation), Cmd+B (bold),
+  /// Cmd+L (unordered list), Shift+Cmd+L (ordered list). Returns
+  /// [KeyEventResult.handled] if a shortcut was matched, otherwise
+  /// [KeyEventResult.ignored].
   ///
   /// [onApply] is called after a text-modifying shortcut is applied
   /// (e.g. to trigger a save).
@@ -32,6 +33,22 @@ class MarkdownShortcuts {
     if (event.logicalKey == LogicalKeyboardKey.escape) {
       node.unfocus();
       return KeyEventResult.handled;
+    }
+
+    // Enter → list / quote auto-continuation
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      // Bail on IME composing — pressing Enter to commit a candidate must
+      // never be intercepted as a list-continuation gesture.
+      if (controller.value.composing.isValid &&
+          !controller.value.composing.isCollapsed) {
+        return KeyEventResult.ignored;
+      }
+      if (applyEnterContinuation(controller)) {
+        onApply?.call();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
     }
 
     final isCmd =
@@ -62,6 +79,79 @@ class MarkdownShortcuts {
     applyShortcut(controller: controller, shortcut: shortcut);
     onApply?.call();
     return KeyEventResult.handled;
+  }
+
+  // ── Enter continuation ─────────────────────────────────────────────────────
+
+  static final _continuationUnorderedRe =
+      RegExp(r'^(\s*)([-*+])(\s+)(.*)$');
+  static final _continuationOrderedRe =
+      RegExp(r'^(\s*)(\d+)\.(\s+)(.*)$');
+  static final _continuationQuoteRe = RegExp(r'^(\s*)(>+)(\s+)(.*)$');
+
+  /// If the caret sits on a line that starts with a list bullet, numbered
+  /// prefix, or `>` quote marker, replicates that prefix on the next line.
+  /// Pressing Enter on an *empty* such line removes the prefix instead
+  /// (terminating the list / quote), matching the convention of every
+  /// modern markdown editor.
+  ///
+  /// Returns `true` if the controller was modified; `false` to defer to
+  /// the platform's default Enter behaviour.
+  ///
+  /// Public for unit testing — production code should go through
+  /// [handleKeyEvent].
+  static bool applyEnterContinuation(TextEditingController controller) {
+    final sel = controller.selection;
+    if (!sel.isCollapsed) return false;
+
+    final text = controller.text;
+    final caret = sel.start;
+
+    // Find the bounds of the current line.
+    final lineStart = text.lastIndexOf('\n', caret - 1) + 1;
+    int lineEnd = text.indexOf('\n', caret);
+    if (lineEnd == -1) lineEnd = text.length;
+    final line = text.substring(lineStart, lineEnd);
+
+    // Match the line against the three continuation patterns.
+    final ulMatch = _continuationUnorderedRe.firstMatch(line);
+    final olMatch = _continuationOrderedRe.firstMatch(line);
+    final qMatch = _continuationQuoteRe.firstMatch(line);
+    final match = ulMatch ?? olMatch ?? qMatch;
+    if (match == null) return false;
+
+    final indent = match.group(1)!;
+    final marker = match.group(2)!;
+    final spacing = match.group(3)!;
+    final content = match.group(4)!;
+
+    // Empty content → terminate: replace the whole line with just its indent.
+    if (content.isEmpty) {
+      final newText =
+          '${text.substring(0, lineStart)}$indent${text.substring(lineEnd)}';
+      controller.value = controller.value.copyWith(
+        text: newText,
+        selection: TextSelection.collapsed(offset: lineStart + indent.length),
+      );
+      return true;
+    }
+
+    // Non-empty content → continue: insert "\n<indent><nextMarker><spacing>".
+    final String nextMarker;
+    if (olMatch != null) {
+      final n = int.tryParse(marker) ?? 1;
+      nextMarker = '${n + 1}.';
+    } else {
+      nextMarker = marker;
+    }
+    final insertion = '\n$indent$nextMarker$spacing';
+    final newText =
+        '${text.substring(0, caret)}$insertion${text.substring(caret)}';
+    controller.value = controller.value.copyWith(
+      text: newText,
+      selection: TextSelection.collapsed(offset: caret + insertion.length),
+    );
+    return true;
   }
 
   /// Applies a Markdown [shortcut] transformation to [controller]'s

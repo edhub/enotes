@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/note.dart';
 import '../models/time_group.dart';
 import 'notes_provider.dart';
 
@@ -31,18 +34,71 @@ final searchQueryProvider =
   SearchQueryNotifier.new,
 );
 
+/// Debounce window applied to keystrokes before they reach the filter.
+/// Short enough to feel instant, long enough to skip per-keystroke fan-out
+/// across hundreds of notes.
+const _searchDebounce = Duration(milliseconds: 120);
+
 class SearchQueryNotifier extends Notifier<SearchState> {
+  Timer? _debounce;
+
   @override
-  SearchState build() => const SearchState();
+  SearchState build() {
+    ref.onDispose(() => _debounce?.cancel());
+    return const SearchState();
+  }
 
-  void set(String query) => state = state.copyWith(query: query);
+  /// Debounced query update — call from `onChanged`.
+  void set(String query) {
+    _debounce?.cancel();
+    if (query.isEmpty) {
+      // Empty / clear is applied immediately so the UI doesn't briefly
+      // keep showing stale filtered results.
+      state = state.copyWith(query: query);
+      return;
+    }
+    _debounce = Timer(_searchDebounce, () {
+      state = state.copyWith(query: query);
+    });
+  }
 
-  void clear() => state = state.copyWith(query: '');
+  void clear() {
+    _debounce?.cancel();
+    state = state.copyWith(query: '');
+  }
 
   /// Signals [NoteSearchBar] to grab keyboard focus (used by Cmd+F).
   void requestFocus() =>
       state = state.copyWith(focusRequest: state.focusRequest + 1);
 }
+
+// ── Lowercase content cache ───────────────────────────────────────────────────
+
+/// Caches `note.content.toLowerCase()` per note id, keyed on the note's
+/// `updatedAt` so it auto-invalidates whenever the content changes.
+///
+/// Without this cache, every keystroke in the search bar re-lowercases
+/// every note's full content — wasted work for the (common) case where
+/// the same notes survive across many filter passes.
+class _LowercaseCache {
+  final Map<String, _Entry> _cache = {};
+
+  String get(Note note) {
+    final entry = _cache[note.id];
+    if (entry != null && entry.updatedAt == note.updatedAt) return entry.lower;
+    final lower = note.content.toLowerCase();
+    _cache[note.id] = _Entry(note.updatedAt, lower);
+    return lower;
+  }
+}
+
+class _Entry {
+  const _Entry(this.updatedAt, this.lower);
+  final DateTime updatedAt;
+  final String lower;
+}
+
+final _lowercaseCache = _LowercaseCache();
 
 // ── Filtered columns ──────────────────────────────────────────────────────────
 
@@ -70,7 +126,7 @@ final filteredTimeColumnsProvider = Provider<List<TimeColumnData>>((ref) {
   final result = <TimeColumnData>[];
   for (final col in columns) {
     final matched = col.notes.where((note) {
-      final content = note.content.toLowerCase();
+      final content = _lowercaseCache.get(note);
       return tokens.every((token) => content.contains(token));
     }).toList();
 
@@ -78,7 +134,6 @@ final filteredTimeColumnsProvider = Provider<List<TimeColumnData>>((ref) {
       result.add(
         TimeColumnData(
           bucketKey: col.bucketKey,
-          group: col.group,
           label: col.label,
           notes: matched,
           sortOrder: col.sortOrder,

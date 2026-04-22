@@ -56,6 +56,15 @@ class _NoteCardState extends ConsumerState<NoteCard> {
     _focusNode = FocusNode(onKeyEvent: _handleKeyEvent)
       ..addListener(_onFocusChanged);
     _controller.addListener(_onTextChanged);
+
+    // Initialise highlight tokens from the current search query, then keep
+    // them in sync via a listener (event-driven, not in build()).
+    _controller.searchTokens = _tokenize(ref.read(searchQueryProvider).query);
+    ref.listenManual<String>(
+      searchQueryProvider.select((s) => s.query),
+      (_, query) => _controller.searchTokens = _tokenize(query),
+    );
+
     if (widget.focusRequestToken != null && widget.focusRequestToken! > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -126,6 +135,16 @@ class _NoteCardState extends ConsumerState<NoteCard> {
     }
   }
 
+  static List<String> _tokenize(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return const [];
+    return trimmed
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((t) => t.isNotEmpty)
+        .toList();
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   static const _minLineHeight = 14.0 * 1.6;
@@ -133,17 +152,6 @@ class _NoteCardState extends ConsumerState<NoteCard> {
 
   @override
   Widget build(BuildContext context) {
-    // Sync search tokens into the controller so buildTextSpan highlights them.
-    final rawQuery =
-        ref.watch(searchQueryProvider.select((s) => s.query)).trim();
-    _controller.searchTokens = rawQuery.isEmpty
-        ? const []
-        : rawQuery
-              .toLowerCase()
-              .split(RegExp(r'\s+'))
-              .where((t) => t.isNotEmpty)
-              .toList();
-
     final nc = Theme.of(context).extension<NoteColors>();
     final bgColor = widget.isDraftView
         ? (nc?.draftCardBackground ?? Theme.of(context).cardTheme.color)
@@ -155,6 +163,9 @@ class _NoteCardState extends ConsumerState<NoteCard> {
         widget.minHeight ??
         (minContentHeight + LayoutConstants.cardPadding * 2);
 
+    // The info button sits in a reserved gutter on the right of the editor
+    // (instead of being absolutely positioned on top of it). This guarantees
+    // the cursor / text never collide with the button — even on long lines.
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -163,17 +174,19 @@ class _NoteCardState extends ConsumerState<NoteCard> {
         hovered: _hovered,
         backgroundColor: bgColor,
         minHeight: minCardHeight,
-        child: Stack(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            MarkdownEditor(
-              controller: _controller,
-              focusNode: _focusNode,
-              hint: 'Start writing…',
-              minLines: minLines,
+            Expanded(
+              child: MarkdownEditor(
+                controller: _controller,
+                focusNode: _focusNode,
+                hint: 'Start writing…',
+                minLines: minLines,
+              ),
             ),
-            Positioned(
-              top: 0,
-              right: 0,
+            SizedBox(
+              width: _infoGutterWidth,
               child: NoteInfoButton(
                 note: widget.note,
                 isDraftView: widget.isDraftView,
@@ -186,4 +199,8 @@ class _NoteCardState extends ConsumerState<NoteCard> {
       ),
     );
   }
+
+  /// Gutter on the right of the editor that hosts the ⋯ info button.
+  /// Width matches the icon (15) + its 5px padding × 2 + breathing room.
+  static const double _infoGutterWidth = 28;
 }

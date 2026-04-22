@@ -1,13 +1,9 @@
 import 'note.dart';
 
-/// Represents which time bucket a note belongs to.
-enum TimeGroup { today, yesterday, thisWeek, lastWeek, isoWeek }
-
 /// Data for one rendered time column.
 class TimeColumnData {
   const TimeColumnData({
     required this.bucketKey,
-    required this.group,
     required this.label,
     required this.notes,
     required this.sortOrder,
@@ -15,8 +11,6 @@ class TimeColumnData {
 
   /// Unique stable key (e.g. 'today', 'last_week', 'week_2026_3_16').
   final String bucketKey;
-
-  final TimeGroup group;
 
   /// Human-readable header label ("Today", "Last Week", "2026 W11").
   final String label;
@@ -55,15 +49,6 @@ abstract final class TimeGroupHelper {
 
     return 'week_${noteMonday.year}_${noteMonday.month}_${noteMonday.day}';
   }
-
-  /// Resolves a bucket key to its [TimeGroup] category.
-  static TimeGroup groupFromKey(String key) => switch (key) {
-        'today' => TimeGroup.today,
-        'yesterday' => TimeGroup.yesterday,
-        'this_week' => TimeGroup.thisWeek,
-        'last_week' => TimeGroup.lastWeek,
-        _ => TimeGroup.isoWeek,
-      };
 
   /// Human-readable column header label for a given bucket key.
   static String labelFromKey(String key) => switch (key) {

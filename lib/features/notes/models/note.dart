@@ -90,4 +90,31 @@ class Note {
     return 'Note(id: $id, isDraft: $isDraft, deleted: $isDeleted, '
         'content: $preview)';
   }
+
+  /// Two notes are equal iff every persisted field matches.
+  ///
+  /// This makes the class safe to use in [Set]s and as a [Map] key, and lets
+  /// Riverpod's `select` skip widget rebuilds when the same note flows
+  /// through unchanged (e.g. unrelated mutations elsewhere in the list).
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Note &&
+        other.id == id &&
+        other.content == content &&
+        other.createdAt == createdAt &&
+        other.updatedAt == updatedAt &&
+        other.isDraft == isDraft &&
+        other.deletedAt == deletedAt;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        id,
+        content,
+        createdAt,
+        updatedAt,
+        isDraft,
+        deletedAt,
+      );
 }
