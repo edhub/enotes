@@ -15,7 +15,10 @@ class TimeColumnData {
   /// Human-readable header label ("Today", "Last Week", "2026 W11").
   final String label;
 
-  /// Active notes in original insertion order (stable — never re-sorted).
+  /// Active notes in a stable, explicit UI order.
+  ///
+  /// eNotes renders notes newest-first within each time column so newly added
+  /// notes appear at the top and keep the same position after app restart.
   final List<Note> notes;
 
   /// Lower value = more recent = rendered further left.

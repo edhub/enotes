@@ -62,7 +62,10 @@ class NotesService {
   /// (no caller can recover beyond what's logged).
   Future<List<Note>> loadNotes() async {
     try {
-      return _db!.select('SELECT * FROM notes').map(_rowToNote).toList();
+      return _db!
+          .select('SELECT * FROM notes ORDER BY created_at DESC, id DESC')
+          .map(_rowToNote)
+          .toList();
     } catch (e, st) {
       log('NotesService.loadNotes failed: $e', error: e, stackTrace: st);
       return [];

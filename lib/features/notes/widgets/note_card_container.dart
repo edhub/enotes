@@ -105,7 +105,10 @@ class NoteCardContainer extends StatelessWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(LayoutConstants.cardBorderRadius),
-        border: Border.all(color: borderColor, width: focused ? 1.15 : 1.0),
+        // Keep border width stable across hover/focus states so the inner
+        // content width never changes and text does not reflow when editing
+        // starts. Focus is conveyed via border colour + shadow only.
+        border: Border.all(color: borderColor, width: 1.0),
         boxShadow: shadow,
       ),
       padding: padding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 13),

@@ -238,16 +238,24 @@ class NotesState {
       (buckets[key] ??= []).add(note);
     }
     return buckets.entries
-        .map(
-          (entry) => TimeColumnData(
+        .map((entry) {
+          final sortedNotes = List<Note>.from(entry.value)
+            ..sort(_compareByCreatedAtDesc);
+          return TimeColumnData(
             bucketKey: entry.key,
             label: TimeGroupHelper.labelFromKey(entry.key),
-            notes: entry.value,
+            notes: sortedNotes,
             sortOrder: TimeGroupHelper.sortOrder(entry.key, now: now),
-          ),
-        )
+          );
+        })
         .toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+  }
+
+  static int _compareByCreatedAtDesc(Note a, Note b) {
+    final byCreatedAt = b.createdAt.compareTo(a.createdAt);
+    if (byCreatedAt != 0) return byCreatedAt;
+    return b.id.compareTo(a.id);
   }
 
   static List<Note> _computeTrashedNotes(List<Note> notes) =>
@@ -353,7 +361,10 @@ class NotesNotifier extends Notifier<NotesState> {
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
-  /// Adds a new regular (non-draft) note at the top of the list.
+  /// Adds a new regular (non-draft) note.
+  ///
+  /// Time columns render newest-first, so newly created notes appear at the
+  /// top and keep that position across restarts.
   void addNote(String content) {
     final note = Note.create(content: content, isDraft: false);
     final updated = [note, ...state.notes];
