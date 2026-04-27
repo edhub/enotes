@@ -49,12 +49,12 @@ flutter run -d macos
 
 ## Docs
 
-- `docs/architecture.md`
-- `docs/persistence.md`
-- `docs/editor-markdown.md`
-- `docs/testing.md`
-- `docs/riverpod.md`
-- `docs/ui-visual-spec.md`
+- [Architecture](docs/architecture.md)
+- [Persistence](docs/persistence.md)
+- [Editor & Markdown](docs/editor-markdown.md)
+- [Testing](docs/testing.md)
+- [Riverpod conventions](docs/riverpod.md)
+- [UI Visual Spec](docs/ui-visual-spec.md)
 
 ## Build & deploy
 

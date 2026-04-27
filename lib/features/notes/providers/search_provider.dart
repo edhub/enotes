@@ -7,6 +7,22 @@ import '../models/note.dart';
 import '../models/time_group.dart';
 import 'notes_provider.dart';
 
+// ── Shared tokenizer ─────────────────────────────────────────────────────────
+
+/// Splits a raw search query into lowercased, non-empty tokens.
+///
+/// Used by both [filteredTimeColumnsProvider] (for note filtering) and
+/// [NoteCard] (for search highlight rendering in [MarkdownController]).
+List<String> searchTokens(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return const [];
+  return trimmed
+      .toLowerCase()
+      .split(RegExp(r'\s+'))
+      .where((t) => t.isNotEmpty)
+      .toList();
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 
 /// Immutable state for the search feature.
@@ -75,10 +91,6 @@ class SearchQueryNotifier extends Notifier<SearchState> {
 
 /// Caches `note.content.toLowerCase()` per note id, keyed on the note's
 /// `updatedAt` so it auto-invalidates whenever the content changes.
-///
-/// Without this cache, every keystroke in the search bar re-lowercases
-/// every note's full content — wasted work for the (common) case where
-/// the same notes survive across many filter passes.
 class _LowercaseCache {
   final Map<String, _Entry> _cache = {};
 
@@ -93,6 +105,7 @@ class _LowercaseCache {
 
 class _Entry {
   const _Entry(this.updatedAt, this.lower);
+
   final DateTime updatedAt;
   final String lower;
 }
@@ -115,11 +128,7 @@ final filteredTimeColumnsProvider = Provider<List<TimeColumnData>>((ref) {
 
   if (query.isEmpty) return columns;
 
-  final tokens = query
-      .toLowerCase()
-      .split(RegExp(r'\s+'))
-      .where((t) => t.isNotEmpty)
-      .toList();
+  final tokens = searchTokens(query);
 
   final result = <TimeColumnData>[];
   for (final col in columns) {

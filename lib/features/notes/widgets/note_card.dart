@@ -24,7 +24,6 @@ class NoteCard extends ConsumerStatefulWidget {
     super.key,
     required this.note,
     required this.isDraftView,
-    required this.columnWidth,
     this.focusRequestToken,
     this.minHeight,
     this.minLines,
@@ -32,7 +31,6 @@ class NoteCard extends ConsumerStatefulWidget {
 
   final Note note;
   final bool isDraftView;
-  final double columnWidth;
   final int? focusRequestToken;
   final double? minHeight;
   final int? minLines;
@@ -59,10 +57,10 @@ class _NoteCardState extends ConsumerState<NoteCard> {
 
     // Initialise highlight tokens from the current search query, then keep
     // them in sync via a listener (event-driven, not in build()).
-    _controller.searchTokens = _tokenize(ref.read(searchQueryProvider).query);
+    _controller.searchTokens = searchTokens(ref.read(searchQueryProvider).query);
     ref.listenManual<String>(
       searchQueryProvider.select((s) => s.query),
-      (_, query) => _controller.searchTokens = _tokenize(query),
+      (_, query) => _controller.searchTokens = searchTokens(query),
     );
 
     if (widget.focusRequestToken != null && widget.focusRequestToken! > 0) {
@@ -133,16 +131,6 @@ class _NoteCardState extends ConsumerState<NoteCard> {
     if (content != widget.note.content) {
       ref.read(notesProvider.notifier).updateNote(widget.note.id, content);
     }
-  }
-
-  static List<String> _tokenize(String raw) {
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty) return const [];
-    return trimmed
-        .toLowerCase()
-        .split(RegExp(r'\s+'))
-        .where((t) => t.isNotEmpty)
-        .toList();
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────

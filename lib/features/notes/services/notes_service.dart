@@ -91,7 +91,7 @@ class NotesService {
             stmt.execute(_noteParams(n));
           }
         } finally {
-          stmt.dispose();
+          stmt.close();
         }
         db.execute('COMMIT');
       } catch (e, st) {
@@ -118,7 +118,7 @@ class NotesService {
             stmt.execute(_noteParams(n));
           }
         } finally {
-          stmt.dispose();
+          stmt.close();
         }
         db.execute('COMMIT');
       } catch (e, st) {
@@ -142,7 +142,7 @@ class NotesService {
             stmt.execute([id]);
           }
         } finally {
-          stmt.dispose();
+          stmt.close();
         }
         db.execute('COMMIT');
       } catch (e, st) {
@@ -159,7 +159,7 @@ class NotesService {
 
   /// Closes the database connection. Safe to call multiple times.
   void dispose() {
-    _db?.dispose();
+    _db?.close();
     _db = null;
   }
 

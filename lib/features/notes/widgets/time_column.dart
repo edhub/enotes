@@ -10,6 +10,7 @@ import '../models/time_group.dart';
 import '../providers/notes_provider.dart';
 import '../providers/search_provider.dart';
 import 'column_header.dart';
+import 'column_panel.dart';
 import 'note_card.dart';
 import 'note_card_container.dart';
 
@@ -62,78 +63,59 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
   Widget build(BuildContext context) {
     final isToday = widget.data.bucketKey == 'today';
     final nc = Theme.of(context).extension<NoteColors>();
-    final borderColor = nc?.columnBorder ?? Theme.of(context).dividerColor;
     final columnSurface =
         nc?.columnSurface ?? Theme.of(context).colorScheme.surface;
     final composerFocusReq = ref.watch(
       notesProvider.select((s) => s.newNoteFocusRequest),
     );
 
-    return SizedBox(
+    return ColumnPanel(
+      surfaceColor: columnSurface,
       width: LayoutConstants.timeColumnWidth,
       height: widget.availableHeight,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: columnSurface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: borderColor),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.black.withValues(alpha: 0.16)
-                  : Colors.black.withValues(alpha: 0.04),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: Column(
-            children: [
-              ColumnHeader(
-                label: widget.data.label,
-                noteCount: widget.data.totalCount,
-                emphasized: isToday,
-              ),
-              Expanded(
-                child: ColoredBox(
-                  color: columnSurface,
-                  child: CustomScrollView(
-                    controller: _scrollController,
-                    slivers: [
-                      // ── New-note composer (Today column only) ─────────────
-                      if (isToday)
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(
-                            LayoutConstants.pageHPad,
-                            LayoutConstants.pageVPad,
-                            LayoutConstants.pageHPad,
-                            10,
-                          ),
-                          sliver: SliverToBoxAdapter(
-                            child: _TodayComposerSection(
-                              scrollController: _scrollController,
-                              focusRequestToken: composerFocusReq,
-                            ),
-                          ),
-                        ),
-
-                      // ── Note cards ────────────────────────────────────────
-                      SliverPadding(
-                        padding: EdgeInsets.only(
-                          top: isToday ? 0 : LayoutConstants.pageVPad,
-                          bottom: LayoutConstants.pageVPad * 4,
-                        ),
-                        sliver: _buildNoteList(context),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+      child: Column(
+        children: [
+          ColumnHeader(
+            label: widget.data.label,
+            noteCount: widget.data.totalCount,
+            emphasized: isToday,
           ),
-        ),
+          Expanded(
+            child: ColoredBox(
+              color: columnSurface,
+              child: CustomScrollView(
+                controller: _scrollController,
+                slivers: [
+                  // ── New-note composer (Today column only) ─────────────
+                  if (isToday)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        LayoutConstants.pageHPad,
+                        LayoutConstants.pageVPad,
+                        LayoutConstants.pageHPad,
+                        10,
+                      ),
+                      sliver: SliverToBoxAdapter(
+                        child: _TodayComposerSection(
+                          scrollController: _scrollController,
+                          focusRequestToken: composerFocusReq,
+                        ),
+                      ),
+                    ),
+
+                  // ── Note cards ────────────────────────────────────────
+                  SliverPadding(
+                    padding: EdgeInsets.only(
+                      top: isToday ? 0 : LayoutConstants.pageVPad,
+                      bottom: LayoutConstants.pageVPad * 4,
+                    ),
+                    sliver: _buildNoteList(context),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -171,7 +153,6 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
               key: ValueKey(note.id),
               note: note,
               isDraftView: false,
-              columnWidth: LayoutConstants.timeColumnWidth,
             ),
           ),
         );

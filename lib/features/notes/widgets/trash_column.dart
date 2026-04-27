@@ -5,6 +5,7 @@ import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/notes_provider.dart';
 import 'column_header.dart';
+import 'column_panel.dart';
 import 'trash_note_card.dart';
 
 /// The right-most column. Shows recently soft-deleted notes.
@@ -34,31 +35,14 @@ class _TrashColumnState extends ConsumerState<TrashColumn> {
   Widget build(BuildContext context) {
     final notes = ref.watch(notesProvider.select((s) => s.trashedNotes));
     final nc = Theme.of(context).extension<NoteColors>();
-    final borderColor = nc?.columnBorder ?? Theme.of(context).dividerColor;
     final columnSurface =
         nc?.columnSurface ?? Theme.of(context).colorScheme.surface;
 
-    return SizedBox(
+    return ColumnPanel(
+      surfaceColor: columnSurface,
       width: LayoutConstants.trashColumnWidth,
       height: widget.availableHeight,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: columnSurface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: borderColor),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.black.withValues(alpha: 0.16)
-                  : Colors.black.withValues(alpha: 0.04),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: Column(
+      child: Column(
             children: [
               _TrashHeader(
                 count: notes.length,
@@ -104,10 +88,8 @@ class _TrashColumnState extends ConsumerState<TrashColumn> {
                   ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
-      ),
     );
   }
 }

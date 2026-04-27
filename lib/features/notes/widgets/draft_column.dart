@@ -5,6 +5,7 @@ import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/notes_provider.dart';
 import '../providers/search_provider.dart';
+import 'column_panel.dart';
 import 'note_card.dart';
 import 'note_search_bar.dart';
 
@@ -44,27 +45,11 @@ class DraftColumn extends ConsumerWidget {
 
     final headerBg = nc?.columnHeader ?? Theme.of(context).colorScheme.surface;
 
-    return SizedBox(
+    return ColumnPanel(
+      surfaceColor: draftBg,
       width: LayoutConstants.draftColumnWidth,
       height: availableHeight,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: draftBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: borderColor),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.black.withValues(alpha: 0.16)
-                  : Colors.black.withValues(alpha: 0.04),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: Column(
+      child: Column(
             children: [
               ColoredBox(
                 color: headerBg,
@@ -102,7 +87,6 @@ class DraftColumn extends ConsumerWidget {
                         key: ValueKey(drafts[safeIndex].id),
                         note: drafts[safeIndex],
                         isDraftView: true,
-                        columnWidth: LayoutConstants.draftColumnWidth,
                         focusRequestToken: focusReq,
                         minHeight: _cardHeight,
                         minLines: 30,
@@ -111,10 +95,8 @@ class DraftColumn extends ConsumerWidget {
                   ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
-      ),
     );
   }
 }
