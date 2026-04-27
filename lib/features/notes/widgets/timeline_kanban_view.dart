@@ -4,12 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
-import '../providers/notes_provider.dart';
 import '../providers/search_provider.dart';
 import 'data_menu_button.dart';
 import 'draft_column.dart';
 import 'jump_to_today_button.dart';
 import 'time_column.dart';
+import 'timeline_shortcuts_controller.dart';
 import 'trash_column.dart';
 
 /// Root layout widget.
@@ -29,104 +29,27 @@ class TimelineKanbanView extends ConsumerStatefulWidget {
 
 class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
   final _hScroll = ScrollController();
+  late final TimelineShortcutsController _shortcuts;
   bool _showJumpButton = false;
 
   @override
   void initState() {
     super.initState();
+    _shortcuts = TimelineShortcutsController(
+      ref: ref,
+      hScroll: _hScroll,
+      isMounted: () => mounted,
+    );
     _hScroll.addListener(_onHScroll);
-    // Register a global hardware-keyboard handler so that Cmd+K fires even
-    // when no widget inside this tree currently holds focus (e.g. after the
-    // user switches to another window and returns without clicking anything).
-    HardwareKeyboard.instance.addHandler(_handleGlobalKey);
+    HardwareKeyboard.instance.addHandler(_shortcuts.handleGlobalKey);
   }
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
+    HardwareKeyboard.instance.removeHandler(_shortcuts.handleGlobalKey);
     _hScroll.removeListener(_onHScroll);
     _hScroll.dispose();
     super.dispose();
-  }
-
-  /// Global key handler: intercepts Cmd+K regardless of focus state.
-  ///
-  /// Returns `true` to consume the event (prevent further propagation)
-  /// only when the shortcut matches, so all other keys pass through normally.
-  bool _handleGlobalKey(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
-    if (!HardwareKeyboard.instance.isMetaPressed) return false;
-
-    final draftIndex = switch (event.logicalKey) {
-      LogicalKeyboardKey.digit1 => 0,
-      LogicalKeyboardKey.digit2 => 1,
-      LogicalKeyboardKey.digit3 => 2,
-      LogicalKeyboardKey.digit4 => 3,
-      LogicalKeyboardKey.digit5 => 4,
-      _ => null,
-    };
-    if (draftIndex != null) {
-      _triggerFocusAction(() {
-        _hScroll.animateTo(
-          0,
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeInOut,
-        );
-        ref.read(notesProvider.notifier).activateDraftAndFocus(draftIndex);
-      });
-      return true;
-    }
-
-    // Cmd+K → focus the new-note composer in the Today column.
-    if (event.logicalKey == LogicalKeyboardKey.keyK) {
-      _triggerFocusAction(() {
-        _hScroll.animateTo(
-          0,
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeInOut,
-        );
-        ref.read(notesProvider.notifier).requestNewNoteFocus();
-      });
-      return true;
-    }
-
-    // Cmd+F → focus the search bar in the Draft column.
-    if (event.logicalKey == LogicalKeyboardKey.keyF) {
-      _triggerFocusAction(() {
-        _hScroll.animateTo(
-          0,
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeInOut,
-        );
-        ref.read(searchQueryProvider.notifier).requestFocus();
-      });
-      return true;
-    }
-
-    return false;
-  }
-
-  /// Executes a focus-triggering [action] immediately if some widget already
-  /// holds focus, or defers it by a short delay when nothing is focused.
-  ///
-  /// On macOS, calling `TextInput.setClient` (triggered internally by
-  /// `FocusNode.requestFocus`) while the OS "window became key" event is still
-  /// being processed causes the text-input connection to not activate until the
-  /// next window-activation cycle. The guard delay lets macOS complete its
-  /// focus hand-off before we ask Flutter to attach a text-input client.
-  void _triggerFocusAction(VoidCallback action) {
-    if (FocusManager.instance.primaryFocus != null &&
-        FocusManager.instance.primaryFocus!.context != null) {
-      // A widget already owns the keyboard — plain focus transfer works fine.
-      action();
-    } else {
-      // No widget is focused: we may be in the middle of a macOS window
-      // activation. Wait one frame + a small platform buffer before acting.
-      Future.delayed(const Duration(milliseconds: 80), () {
-        if (!mounted) return;
-        action();
-      });
-    }
   }
 
   void _onHScroll() {

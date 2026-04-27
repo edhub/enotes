@@ -6,6 +6,14 @@ install := "/Applications/" + app + ".app"
 default:
     @just --list
 
+# 代码格式化
+format:
+    dart format lib test
+
+# 自动应用可安全修复
+fix:
+    dart fix --apply
+
 # 静态检查（应 0 issues）
 analyze:
     flutter analyze
