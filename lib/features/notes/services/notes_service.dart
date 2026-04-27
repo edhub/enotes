@@ -180,7 +180,9 @@ class NotesService {
   void _safeRollback(Database db) {
     try {
       db.execute('ROLLBACK');
-    } catch (_) {/* ignore */}
+    } catch (_) {
+      /* ignore */
+    }
   }
 
   static const _insertSql =
@@ -192,22 +194,22 @@ class NotesService {
       'VALUES (?, ?, ?, ?, ?, ?)';
 
   List<Object?> _noteParams(Note n) => [
-        n.id,
-        n.content,
-        n.createdAt.toIso8601String(),
-        n.updatedAt.toIso8601String(),
-        n.isDraft ? 1 : 0,
-        n.deletedAt?.toIso8601String(),
-      ];
+    n.id,
+    n.content,
+    n.createdAt.toIso8601String(),
+    n.updatedAt.toIso8601String(),
+    n.isDraft ? 1 : 0,
+    n.deletedAt?.toIso8601String(),
+  ];
 
   Note _rowToNote(Row row) => Note(
-        id: row['id'] as String,
-        content: row['content'] as String,
-        createdAt: DateTime.parse(row['created_at'] as String),
-        updatedAt: DateTime.parse(row['updated_at'] as String),
-        isDraft: (row['is_draft'] as int) == 1,
-        deletedAt: row['deleted_at'] != null
-            ? DateTime.parse(row['deleted_at'] as String)
-            : null,
-      );
+    id: row['id'] as String,
+    content: row['content'] as String,
+    createdAt: DateTime.parse(row['created_at'] as String),
+    updatedAt: DateTime.parse(row['updated_at'] as String),
+    isDraft: (row['is_draft'] as int) == 1,
+    deletedAt: row['deleted_at'] != null
+        ? DateTime.parse(row['deleted_at'] as String)
+        : null,
+  );
 }

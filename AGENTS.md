@@ -37,12 +37,13 @@ lib/
 │   │   │   ├── migration_service.dart  # JSON → SQLite 一次性迁移
 │   │   │   └── export_service.dart  # JSON/Markdown 导入导出
 │   │   ├── providers/
-│   │   │   ├── notes_provider.dart  # NotesState + NotesNotifier + 基础设施 providers
+│   │   │   ├── notes_provider.dart  # NotesNotifier + 基础设施 providers
+│   │   │   ├── now_provider.dart    # 跨午夜重分组触发器
 │   │   │   └── search_provider.dart # SearchState + filteredTimeColumnsProvider
 │   │   └── widgets/
 │   │       ├── timeline_kanban_view.dart   # 根布局：横向滚动 + 列编排
 │   │       ├── draft_column.dart           # 草稿列（450px），Chrome 风格 tab 栏
-│   │       ├── time_column.dart            # 时间分组列（380px）含新建笔记 Composer
+│   │       ├── time_column.dart            # 时间分组列（392px）含新建笔记 Composer
 │   │       ├── trash_column.dart           # 回收站列（最右侧）
 │   │       ├── note_card.dart              # 单条笔记卡片（inline MarkdownEditor）
 │   │       ├── note_card_container.dart    # 共享卡片装饰（border/shadow/hover）
@@ -131,7 +132,7 @@ NotesNotifier
 ```
 
 - 增量保存：只写变更的笔记，不做全表 DELETE + INSERT
-- 800ms 防抖；失焦立即 flush；生命周期 inactive/detached 时 flush
+- 800ms 防抖；失焦立即 flush；生命周期 `hidden` / `paused` / `detached` 时 flush
 - `importNotes` 例外：全量 DELETE + INSERT（完整替换）
 
 ---
@@ -143,8 +144,8 @@ Scaffold → Stack
   ├── Scrollbar + SingleChildScrollView(horizontal)   ← 横向主轴
   │     └── SizedBox(height) → Row
   │           ├── DraftColumn (450px)
-  │           ├── TimeColumn × N (380px each)
-  │           └── TrashColumn (380px)
+  │           ├── TimeColumn × N (392px each)
+  │           └── TrashColumn (368px)
   └── Positioned：Jump button（左下）、DataMenuButton（右上）
 ```
 

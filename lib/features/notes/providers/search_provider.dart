@@ -22,15 +22,14 @@ class SearchState {
   final int focusRequest;
 
   SearchState copyWith({String? query, int? focusRequest}) => SearchState(
-        query: query ?? this.query,
-        focusRequest: focusRequest ?? this.focusRequest,
-      );
+    query: query ?? this.query,
+    focusRequest: focusRequest ?? this.focusRequest,
+  );
 }
 
 // ── Notifier ──────────────────────────────────────────────────────────────────
 
-final searchQueryProvider =
-    NotifierProvider<SearchQueryNotifier, SearchState>(
+final searchQueryProvider = NotifierProvider<SearchQueryNotifier, SearchState>(
   SearchQueryNotifier.new,
 );
 
@@ -111,8 +110,7 @@ final _lowercaseCache = _LowercaseCache();
 ///   if ALL tokens appear as case-insensitive substrings in [Note.content].
 /// - Columns with zero matching notes are omitted from the result.
 final filteredTimeColumnsProvider = Provider<List<TimeColumnData>>((ref) {
-  final query =
-      ref.watch(searchQueryProvider.select((s) => s.query)).trim();
+  final query = ref.watch(searchQueryProvider.select((s) => s.query)).trim();
   final columns = ref.watch(notesProvider.select((s) => s.timeColumns));
 
   if (query.isEmpty) return columns;

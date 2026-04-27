@@ -55,21 +55,21 @@ abstract final class TimeGroupHelper {
 
   /// Human-readable column header label for a given bucket key.
   static String labelFromKey(String key) => switch (key) {
-        'today' => 'Today',
-        'yesterday' => 'Yesterday',
-        'this_week' => 'This Week',
-        'last_week' => 'Last Week',
-        _ => _isoWeekLabel(key),
-      };
+    'today' => 'Today',
+    'yesterday' => 'Yesterday',
+    'this_week' => 'This Week',
+    'last_week' => 'Last Week',
+    _ => _isoWeekLabel(key),
+  };
 
   /// Sort priority: lower = more recent = further left on screen.
   static int sortOrder(String key, {DateTime? now}) => switch (key) {
-        'today' => 0,
-        'yesterday' => 1,
-        'this_week' => 2,
-        'last_week' => 3,
-        _ => _isoWeekSortOrder(key, now: now),
-      };
+    'today' => 0,
+    'yesterday' => 1,
+    'this_week' => 2,
+    'last_week' => 3,
+    _ => _isoWeekSortOrder(key, now: now),
+  };
 
   /// ISO 8601 week number (Monday-based, 1-53).
   static int isoWeekNumber(DateTime date) {
@@ -106,7 +106,9 @@ abstract final class TimeGroupHelper {
   static int _isoWeekSortOrder(String key, {DateTime? now}) {
     final monday = _parseWeekKey(key);
     if (monday == null) return 999999;
-    final daysAgo = (now?.toLocal() ?? DateTime.now()).difference(monday).inDays;
+    final daysAgo = (now?.toLocal() ?? DateTime.now())
+        .difference(monday)
+        .inDays;
     return 4 + daysAgo;
   }
 }

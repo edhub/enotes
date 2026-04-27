@@ -53,17 +53,16 @@ void main() {
 
     test('timeColumns contain non-draft non-deleted notes', () {
       final state = NotesState(notes: sampleNotes);
-      final allTimeNotes =
-          state.timeColumns.expand((col) => col.notes).toList();
+      final allTimeNotes = state.timeColumns
+          .expand((col) => col.notes)
+          .toList();
       expect(allTimeNotes.length, 2);
       expect(allTimeNotes.map((n) => n.id), containsAll(['2', '3']));
     });
 
     test('timeColumns always include today bucket', () {
       final state = NotesState(notes: []);
-      final todayCol = state.timeColumns.where(
-        (c) => c.bucketKey == 'today',
-      );
+      final todayCol = state.timeColumns.where((c) => c.bucketKey == 'today');
       expect(todayCol.length, 1);
       expect(todayCol.first.notes, isEmpty);
     });
@@ -128,9 +127,9 @@ void main() {
     });
 
     test('copyWith clearDeletedAt restores note', () {
-      final note = Note.create(content: 'test').copyWith(
-        deletedAt: DateTime.now().toUtc(),
-      );
+      final note = Note.create(
+        content: 'test',
+      ).copyWith(deletedAt: DateTime.now().toUtc());
       expect(note.isDeleted, isTrue);
       final restored = note.copyWith(clearDeletedAt: true);
       expect(restored.isDeleted, isFalse);
@@ -152,7 +151,8 @@ void main() {
 
     test('toString truncates long content', () {
       final note = Note.create(
-        content: 'This is a very long content string that exceeds twenty characters',
+        content:
+            'This is a very long content string that exceeds twenty characters',
       );
       final str = note.toString();
       expect(str, contains('…'));

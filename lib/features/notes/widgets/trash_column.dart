@@ -162,13 +162,17 @@ class _TrashHeader extends StatelessWidget {
               style: TextButton.styleFrom(
                 foregroundColor: mutedDestructive,
                 backgroundColor: Colors.transparent,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
-                  side: BorderSide(color: mutedDestructive.withValues(alpha: 0.24)),
+                  side: BorderSide(
+                    color: mutedDestructive.withValues(alpha: 0.24),
+                  ),
                 ),
               ),
               child: const Text(

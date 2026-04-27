@@ -52,35 +52,34 @@ class Note {
     bool? isDraft,
     DateTime? deletedAt,
     bool clearDeletedAt = false,
-  }) =>
-      Note(
-        id: id,
-        content: content ?? this.content,
-        createdAt: createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-        isDraft: isDraft ?? this.isDraft,
-        deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
-      );
+  }) => Note(
+    id: id,
+    content: content ?? this.content,
+    createdAt: createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    isDraft: isDraft ?? this.isDraft,
+    deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'content': content,
-        'created_at': createdAt.toIso8601String(),
-        'updated_at': updatedAt.toIso8601String(),
-        'is_draft': isDraft,
-        'deleted_at': deletedAt?.toIso8601String(),
-      };
+    'id': id,
+    'content': content,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+    'is_draft': isDraft,
+    'deleted_at': deletedAt?.toIso8601String(),
+  };
 
   factory Note.fromJson(Map<String, dynamic> json) => Note(
-        id: json['id'] as String,
-        content: json['content'] as String,
-        createdAt: DateTime.parse(json['created_at'] as String),
-        updatedAt: DateTime.parse(json['updated_at'] as String),
-        isDraft: json['is_draft'] as bool? ?? false,
-        deletedAt: json['deleted_at'] != null
-            ? DateTime.parse(json['deleted_at'] as String)
-            : null,
-      );
+    id: json['id'] as String,
+    content: json['content'] as String,
+    createdAt: DateTime.parse(json['created_at'] as String),
+    updatedAt: DateTime.parse(json['updated_at'] as String),
+    isDraft: json['is_draft'] as bool? ?? false,
+    deletedAt: json['deleted_at'] != null
+        ? DateTime.parse(json['deleted_at'] as String)
+        : null,
+  );
 
   @override
   String toString() {
@@ -109,12 +108,6 @@ class Note {
   }
 
   @override
-  int get hashCode => Object.hash(
-        id,
-        content,
-        createdAt,
-        updatedAt,
-        isDraft,
-        deletedAt,
-      );
+  int get hashCode =>
+      Object.hash(id, content, createdAt, updatedAt, isDraft, deletedAt);
 }

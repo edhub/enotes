@@ -31,15 +31,18 @@ class MigrationService {
     try {
       final raw = await jsonFile.readAsString();
       final list = jsonDecode(raw) as List<dynamic>;
-      final notes =
-          list.map((e) => Note.fromJson(e as Map<String, dynamic>)).toList();
+      final notes = list
+          .map((e) => Note.fromJson(e as Map<String, dynamic>))
+          .toList();
 
       await _service.saveNotes(notes);
 
       // Rename instead of delete — preserve as emergency backup.
       await jsonFile.rename('${jsonFile.path}.migrated');
-      log('MigrationService: ✓ ${notes.length} notes migrated, '
-          'JSON renamed to .migrated');
+      log(
+        'MigrationService: ✓ ${notes.length} notes migrated, '
+        'JSON renamed to .migrated',
+      );
     } catch (e, st) {
       // Do not propagate: a failed migration must never block app startup.
       // The legacy JSON file is preserved (we never delete it on failure),

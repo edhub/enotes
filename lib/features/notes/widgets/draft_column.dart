@@ -75,10 +75,7 @@ class DraftColumn extends ConsumerWidget {
                   child: NoteSearchBar(focusRequestToken: searchFocusReq),
                 ),
               ),
-              Container(
-                height: 1,
-                color: borderColor.withValues(alpha: 0.7),
-              ),
+              Container(height: 1, color: borderColor.withValues(alpha: 0.7)),
               Container(
                 color: headerBg,
                 child: _ChromeTabBar(
@@ -99,10 +96,8 @@ class DraftColumn extends ConsumerWidget {
                     ),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 220),
-                      transitionBuilder: (child, anim) => FadeTransition(
-                        opacity: anim,
-                        child: child,
-                      ),
+                      transitionBuilder: (child, anim) =>
+                          FadeTransition(opacity: anim, child: child),
                       child: NoteCard(
                         key: ValueKey(drafts[safeIndex].id),
                         note: drafts[safeIndex],

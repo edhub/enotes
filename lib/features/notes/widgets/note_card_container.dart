@@ -47,8 +47,9 @@ class NoteCardContainer extends StatelessWidget {
           offset: const Offset(0, 10),
         ),
         BoxShadow(
-          color: (nc?.cardBorderFocused ?? Theme.of(context).colorScheme.primary)
-              .withValues(alpha: 0.18),
+          color:
+              (nc?.cardBorderFocused ?? Theme.of(context).colorScheme.primary)
+                  .withValues(alpha: 0.18),
           blurRadius: 0,
           spreadRadius: 2,
         ),
@@ -60,8 +61,9 @@ class NoteCardContainer extends StatelessWidget {
           offset: const Offset(0, 10),
         ),
         BoxShadow(
-          color: (nc?.cardBorderFocused ?? Theme.of(context).colorScheme.primary)
-              .withValues(alpha: 0.14),
+          color:
+              (nc?.cardBorderFocused ?? Theme.of(context).colorScheme.primary)
+                  .withValues(alpha: 0.14),
           blurRadius: 0,
           spreadRadius: 2,
         ),
@@ -111,7 +113,8 @@ class NoteCardContainer extends StatelessWidget {
         border: Border.all(color: borderColor, width: 1.0),
         boxShadow: shadow,
       ),
-      padding: padding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      padding:
+          padding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       child: child,
     );
   }

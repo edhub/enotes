@@ -70,7 +70,8 @@ class CountBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color:
-            nc?.badgeBackground ?? Theme.of(context).colorScheme.surfaceContainerHighest,
+            nc?.badgeBackground ??
+            Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: nc?.columnBorder ?? Theme.of(context).dividerColor,
@@ -78,9 +79,9 @@ class CountBadge extends StatelessWidget {
       ),
       child: Text(
         '$count',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: nc?.badgeForeground,
-        ),
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: nc?.badgeForeground),
       ),
     );
   }

@@ -60,7 +60,7 @@ class _Colors {
 /// - Ordered lists `1.`
 /// - Horizontal rules `---`
 /// - Inline: bold (`*`/`**`/`***`/`_`/`__`),
-///   strikethrough (`~~`), inline code (`` ` ``),
+///   strikethrough (`~~`), highlight (`==`), inline code (`` ` ``),
 ///   links `[text](url)`
 ///   Note: single `*`/`_` also render as bold — no separate italic style.
 class MarkdownParser {
@@ -290,6 +290,14 @@ class MarkdownParser {
         style: base.copyWith(fontWeight: FontWeight.bold),
       ),
     ),
+    // Highlight  ==text==
+    _Pattern(
+      RegExp(r'==(?!\s)([^=\n]+)(?<!\s)=='),
+      (m, base, c) => TextSpan(
+        text: m.group(0),
+        style: base.copyWith(backgroundColor: c.searchHighlightBg),
+      ),
+    ),
     // Strikethrough  ~~text~~
     _Pattern(
       RegExp(r'~~(?!\s)([^~\n]+)(?<!\s)~~'),
@@ -337,13 +345,10 @@ class MarkdownParser {
     }
 
     // Internal node: recurse into children.
-    final newChildren =
-        span.children?.map((c) => _highlightSearch(c, patterns, bg)).toList();
-    return TextSpan(
-      text: span.text,
-      style: span.style,
-      children: newChildren,
-    );
+    final newChildren = span.children
+        ?.map((c) => _highlightSearch(c, patterns, bg))
+        .toList();
+    return TextSpan(text: span.text, style: span.style, children: newChildren);
   }
 
   /// Splits a plain-text leaf [TextSpan] at all match positions of [patterns],
@@ -382,10 +387,12 @@ class MarkdownParser {
       if (start > pos) {
         children.add(TextSpan(text: text.substring(pos, start), style: style));
       }
-      children.add(TextSpan(
-        text: text.substring(start, end),
-        style: (style ?? const TextStyle()).copyWith(backgroundColor: bg),
-      ));
+      children.add(
+        TextSpan(
+          text: text.substring(start, end),
+          style: (style ?? const TextStyle()).copyWith(backgroundColor: bg),
+        ),
+      );
       pos = end;
     }
     if (pos < text.length) {

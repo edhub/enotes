@@ -149,37 +149,33 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
     );
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, i) {
-          final note = col.notes[i];
-          // "New" = created after this column mounted *and* within the last
-          // few seconds. The second clause prevents the animation from
-          // replaying when the user scrolls a long-since-added note in and
-          // out of the viewport (SliverList disposes off-screen state).
-          final age = DateTime.now().toUtc().difference(note.createdAt);
-          final isNew =
-              note.createdAt.isAfter(_mountedAt) && age.inSeconds < 2;
+      delegate: SliverChildBuilderDelegate((context, i) {
+        final note = col.notes[i];
+        // "New" = created after this column mounted *and* within the last
+        // few seconds. The second clause prevents the animation from
+        // replaying when the user scrolls a long-since-added note in and
+        // out of the viewport (SliverList disposes off-screen state).
+        final age = DateTime.now().toUtc().difference(note.createdAt);
+        final isNew = note.createdAt.isAfter(_mountedAt) && age.inSeconds < 2;
 
-          return _SlideInNewItem(
-            key: ValueKey('slide-${note.id}'),
-            isNew: isNew,
-            child: Padding(
-              padding: const EdgeInsets.only(
-                left: LayoutConstants.pageHPad,
-                right: LayoutConstants.pageHPad,
-                bottom: LayoutConstants.cardMarginBottom,
-              ),
-              child: NoteCard(
-                key: ValueKey(note.id),
-                note: note,
-                isDraftView: false,
-                columnWidth: LayoutConstants.timeColumnWidth,
-              ),
+        return _SlideInNewItem(
+          key: ValueKey('slide-${note.id}'),
+          isNew: isNew,
+          child: Padding(
+            padding: const EdgeInsets.only(
+              left: LayoutConstants.pageHPad,
+              right: LayoutConstants.pageHPad,
+              bottom: LayoutConstants.cardMarginBottom,
             ),
-          );
-        },
-        childCount: col.notes.length,
-      ),
+            child: NoteCard(
+              key: ValueKey(note.id),
+              note: note,
+              isDraftView: false,
+              columnWidth: LayoutConstants.timeColumnWidth,
+            ),
+          ),
+        );
+      }, childCount: col.notes.length),
     );
   }
 }
@@ -314,10 +310,7 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
         controller: _controller,
         focusNode: _focusNode,
         hint: 'Capture what matters next…',
-        style: const TextStyle(
-          fontSize: 14.1,
-          height: 1.62,
-        ),
+        style: const TextStyle(fontSize: 14.1, height: 1.62),
       ),
     );
   }
@@ -326,11 +319,7 @@ class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
 // ── Slide-in Animation ────────────────────────────────────────────────────────
 
 class _SlideInNewItem extends StatefulWidget {
-  const _SlideInNewItem({
-    super.key,
-    required this.child,
-    required this.isNew,
-  });
+  const _SlideInNewItem({super.key, required this.child, required this.isNew});
 
   final Widget child;
   final bool isNew;
@@ -377,13 +366,9 @@ class _SlideInNewItemState extends State<_SlideInNewItem>
       ),
       axisAlignment: -1.0, // Aligns to top, pushing content downwards
       child: FadeTransition(
-        opacity: CurvedAnimation(
-          parent: _controller,
-          curve: Curves.easeIn,
-        ),
+        opacity: CurvedAnimation(parent: _controller, curve: Curves.easeIn),
         child: widget.child,
       ),
     );
   }
 }
-

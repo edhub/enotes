@@ -19,6 +19,7 @@ List<TextSpan> _flat(InlineSpan root) {
       s.children?.forEach(visit);
     }
   }
+
   visit(root);
   return out;
 }
@@ -30,6 +31,8 @@ TextSpan? _spanOf(List<TextSpan> spans, String t) =>
 // Style predicate shortcuts ────────────────────────────────────────────────────
 bool _bold(List<TextSpan> s) =>
     s.any((e) => e.style?.fontWeight == FontWeight.bold);
+bool _semibold(List<TextSpan> s) =>
+    s.any((e) => e.style?.fontWeight == FontWeight.w600);
 bool _italic(List<TextSpan> s) =>
     s.any((e) => e.style?.fontStyle == FontStyle.italic);
 bool _strike(List<TextSpan> s) => s.any(
@@ -117,25 +120,64 @@ void main() {
     });
 
     // ❌ no match — no closing delimiter
-    test('no close ** → no bold', () => expect(_bold(_flat(_build('**bold'))), isFalse));
-    test('no close * → no bold', () => expect(_bold(_flat(_build('*bold'))), isFalse));
-    test('no close zh → no bold', () => expect(_bold(_flat(_build('**粗体'))), isFalse));
-    test('no close * zh → no bold', () => expect(_bold(_flat(_build('*粗体'))), isFalse));
+    test(
+      'no close ** → no bold',
+      () => expect(_bold(_flat(_build('**bold'))), isFalse),
+    );
+    test(
+      'no close * → no bold',
+      () => expect(_bold(_flat(_build('*bold'))), isFalse),
+    );
+    test(
+      'no close zh → no bold',
+      () => expect(_bold(_flat(_build('**粗体'))), isFalse),
+    );
+    test(
+      'no close * zh → no bold',
+      () => expect(_bold(_flat(_build('*粗体'))), isFalse),
+    );
 
     // ❌ no match — space after open / before close
-    test('space after ** open → no bold', () => expect(_bold(_flat(_build('** bold**'))), isFalse));
-    test('space after * open → no bold', () => expect(_bold(_flat(_build('* bold*'))), isFalse));
-    test('space before ** close → no bold', () => expect(_bold(_flat(_build('**bold **'))), isFalse));
-    test('space before * close → no bold', () => expect(_bold(_flat(_build('*bold *'))), isFalse));
-    test('both spaces * → no bold', () => expect(_bold(_flat(_build('* bold *'))), isFalse));
+    test(
+      'space after ** open → no bold',
+      () => expect(_bold(_flat(_build('** bold**'))), isFalse),
+    );
+    test(
+      'space after * open → no bold',
+      () => expect(_bold(_flat(_build('* bold*'))), isFalse),
+    );
+    test(
+      'space before ** close → no bold',
+      () => expect(_bold(_flat(_build('**bold **'))), isFalse),
+    );
+    test(
+      'space before * close → no bold',
+      () => expect(_bold(_flat(_build('*bold *'))), isFalse),
+    );
+    test(
+      'both spaces * → no bold',
+      () => expect(_bold(_flat(_build('* bold *'))), isFalse),
+    );
 
     // ❌ no match — snake_case / word-adjacent _
-    test('__ inside snake_case → no bold', () => expect(_bold(_flat(_build('foo__bar__baz'))), isFalse));
-    test('_ inside foo_bar_baz → no bold', () => expect(_bold(_flat(_build('foo_bar_baz'))), isFalse));
-    test('__ word-adjacent zh → no bold', () => expect(_bold(_flat(_build('foo__中文__bar'))), isFalse));
+    test(
+      '__ inside snake_case → no bold',
+      () => expect(_bold(_flat(_build('foo__bar__baz'))), isFalse),
+    );
+    test(
+      '_ inside foo_bar_baz → no bold',
+      () => expect(_bold(_flat(_build('foo_bar_baz'))), isFalse),
+    );
+    test(
+      '__ word-adjacent zh → no bold',
+      () => expect(_bold(_flat(_build('foo__中文__bar'))), isFalse),
+    );
 
     // ❌ unrelated * (surrounded by spaces)
-    test('* as multiply → no bold', () => expect(_bold(_flat(_build(r'$5 * 3 = $15'))), isFalse));
+    test(
+      '* as multiply → no bold',
+      () => expect(_bold(_flat(_build(r'$5 * 3 = $15'))), isFalse),
+    );
     test('unrelated * → only adjacent pair matches', () {
       final s = _flat(_build('use * to multiply and *also* to denote'));
       expect(_spanOf(s, '*also*')?.style?.fontWeight, FontWeight.bold);
@@ -147,47 +189,85 @@ void main() {
   // ── inline — strikethrough ─────────────────────────────────────────────────
 
   group('inline — strikethrough', () {
-    test('~~strike~~ en', () => expect(_strike(_flat(_build('~~strike~~'))), isTrue));
+    test(
+      '~~strike~~ en',
+      () => expect(_strike(_flat(_build('~~strike~~'))), isTrue),
+    );
 
     test('~~删除线~~ zh', () => expect(_strike(_flat(_build('~~删除线~~'))), isTrue));
 
     test('surrounded — en', () {
       final s = _flat(_build('text ~~deleted~~ text'));
-      expect(_spanOf(s, '~~deleted~~')?.style?.decoration, TextDecoration.lineThrough);
+      expect(
+        _spanOf(s, '~~deleted~~')?.style?.decoration,
+        TextDecoration.lineThrough,
+      );
     });
 
     test('surrounded — zh', () {
       final s = _flat(_build('这段~~过期内容~~请忽略'));
-      expect(_spanOf(s, '~~过期内容~~')?.style?.decoration, TextDecoration.lineThrough);
+      expect(
+        _spanOf(s, '~~过期内容~~')?.style?.decoration,
+        TextDecoration.lineThrough,
+      );
     });
 
     test('multiple — mixed', () {
       final s = _flat(_build('~~old~~ and ~~废弃~~'));
-      expect(_spanOf(s, '~~old~~')?.style?.decoration, TextDecoration.lineThrough);
-      expect(_spanOf(s, '~~废弃~~')?.style?.decoration, TextDecoration.lineThrough);
+      expect(
+        _spanOf(s, '~~old~~')?.style?.decoration,
+        TextDecoration.lineThrough,
+      );
+      expect(
+        _spanOf(s, '~~废弃~~')?.style?.decoration,
+        TextDecoration.lineThrough,
+      );
     });
 
     // ❌
-    test('no close → no strike', () => expect(_strike(_flat(_build('~~strike'))), isFalse));
-    test('no close zh → no strike', () => expect(_strike(_flat(_build('~~删除线'))), isFalse));
-    test('space after open → no strike', () => expect(_strike(_flat(_build('~~ strike~~'))), isFalse));
-    test('space before close → no strike', () => expect(_strike(_flat(_build('~~strike ~~'))), isFalse));
+    test(
+      'no close → no strike',
+      () => expect(_strike(_flat(_build('~~strike'))), isFalse),
+    );
+    test(
+      'no close zh → no strike',
+      () => expect(_strike(_flat(_build('~~删除线'))), isFalse),
+    );
+    test(
+      'space after open → no strike',
+      () => expect(_strike(_flat(_build('~~ strike~~'))), isFalse),
+    );
+    test(
+      'space before close → no strike',
+      () => expect(_strike(_flat(_build('~~strike ~~'))), isFalse),
+    );
   });
 
   // ── inline — highlight ─────────────────────────────────────────────────────
 
   group('inline — highlight', () {
-    test('==highlight== en', () => expect(_hl(_flat(_build('==highlight=='))), isTrue));
+    test(
+      '==highlight== en',
+      () => expect(_hl(_flat(_build('==highlight=='))), isTrue),
+    );
     test('==重要内容== zh', () => expect(_hl(_flat(_build('==重要内容=='))), isTrue));
 
     test('surrounded — zh', () {
-      expect(_spanOf(_flat(_build('请注意==关键字==内容')), '==关键字==')?.style?.backgroundColor, isNotNull);
+      expect(
+        _spanOf(
+          _flat(_build('请注意==关键字==内容')),
+          '==关键字==',
+        )?.style?.backgroundColor,
+        isNotNull,
+      );
     });
 
     test('surrounded — en', () {
       expect(
-        _spanOf(_flat(_build('remember to ==fix this== before merge')), '==fix this==')
-            ?.style?.backgroundColor,
+        _spanOf(
+          _flat(_build('remember to ==fix this== before merge')),
+          '==fix this==',
+        )?.style?.backgroundColor,
         isNotNull,
       );
     });
@@ -199,9 +279,18 @@ void main() {
     });
 
     // ❌
-    test('no close → no highlight', () => expect(_hl(_flat(_build('==sdf'))), isFalse));
-    test('space after open → no highlight', () => expect(_hl(_flat(_build('== sdf=='))), isFalse));
-    test('space before close → no highlight', () => expect(_hl(_flat(_build('==sdf =='))), isFalse));
+    test(
+      'no close → no highlight',
+      () => expect(_hl(_flat(_build('==sdf'))), isFalse),
+    );
+    test(
+      'space after open → no highlight',
+      () => expect(_hl(_flat(_build('== sdf=='))), isFalse),
+    );
+    test(
+      'space before close → no highlight',
+      () => expect(_hl(_flat(_build('==sdf =='))), isFalse),
+    );
   });
 
   // ── inline — inline code ───────────────────────────────────────────────────
@@ -228,11 +317,20 @@ void main() {
     });
 
     test('code bg in dark mode', () {
-      expect(_spanOf(_flat(_build('`code`', isDark: true)), '`code`')?.style?.backgroundColor, isNotNull);
+      expect(
+        _spanOf(
+          _flat(_build('`code`', isDark: true)),
+          '`code`',
+        )?.style?.backgroundColor,
+        isNotNull,
+      );
     });
 
     // ❌
-    test('no close → no mono', () => expect(_mono(_flat(_build('`code'))), isFalse));
+    test(
+      'no close → no mono',
+      () => expect(_mono(_flat(_build('`code'))), isFalse),
+    );
   });
 
   // ── inline — link ──────────────────────────────────────────────────────────
@@ -241,10 +339,16 @@ void main() {
     test('[text](url) en', () {
       final s = _flat(_build('[click here](https://example.com)'));
       expect(_ul(s), isTrue);
-      expect(_spanOf(s, '[click here](https://example.com)')?.style?.color, isNotNull);
+      expect(
+        _spanOf(s, '[click here](https://example.com)')?.style?.color,
+        isNotNull,
+      );
     });
 
-    test('[中文链接](url) zh', () => expect(_ul(_flat(_build('[点击这里](https://example.com)'))), isTrue));
+    test(
+      '[中文链接](url) zh',
+      () => expect(_ul(_flat(_build('[点击这里](https://example.com)'))), isTrue),
+    );
 
     test('link among sentence — zh', () {
       final s = _flat(_build('详情请查看[文档](https://docs.example.com)了解'));
@@ -259,17 +363,28 @@ void main() {
     });
 
     test('link among sentence — en', () {
-      final s = _flat(_build('see [release notes](https://github.com/releases) for details'));
+      final s = _flat(
+        _build('see [release notes](https://github.com/releases) for details'),
+      );
       expect(
-        _spanOf(s, '[release notes](https://github.com/releases)')?.style?.decoration,
+        _spanOf(
+          s,
+          '[release notes](https://github.com/releases)',
+        )?.style?.decoration,
         TextDecoration.underline,
       );
     });
 
     test('multiple links', () {
       final s = _flat(_build('[home](/) and [关于我们](/about)'));
-      expect(_spanOf(s, '[home](/)')?.style?.decoration, TextDecoration.underline);
-      expect(_spanOf(s, '[关于我们](/about)')?.style?.decoration, TextDecoration.underline);
+      expect(
+        _spanOf(s, '[home](/)')?.style?.decoration,
+        TextDecoration.underline,
+      );
+      expect(
+        _spanOf(s, '[关于我们](/about)')?.style?.decoration,
+        TextDecoration.underline,
+      );
     });
   });
 
@@ -286,7 +401,10 @@ void main() {
     test('bold + strike — zh', () {
       final s = _flat(_build('**粗体**和~~删除~~'));
       expect(_spanOf(s, '**粗体**')?.style?.fontWeight, FontWeight.bold);
-      expect(_spanOf(s, '~~删除~~')?.style?.decoration, TextDecoration.lineThrough);
+      expect(
+        _spanOf(s, '~~删除~~')?.style?.decoration,
+        TextDecoration.lineThrough,
+      );
     });
 
     test('code + bold + strike — en', () {
@@ -297,20 +415,26 @@ void main() {
     });
 
     test('all inline types — mixed zh/en', () {
-      final s = _flat(_build(
-        '今天**很重要**，请*认真*阅读`README`，~~旧版本~~已废弃，==高亮==关键内容',
-      ));
+      final s = _flat(
+        _build('今天**很重要**，请*认真*阅读`README`，~~旧版本~~已废弃，==高亮==关键内容'),
+      );
       expect(_spanOf(s, '**很重要**')?.style?.fontWeight, FontWeight.bold);
       expect(_spanOf(s, '*认真*')?.style?.fontWeight, FontWeight.bold);
       expect(_spanOf(s, '`README`')?.style?.fontFamily, 'monospace');
-      expect(_spanOf(s, '~~旧版本~~')?.style?.decoration, TextDecoration.lineThrough);
+      expect(
+        _spanOf(s, '~~旧版本~~')?.style?.decoration,
+        TextDecoration.lineThrough,
+      );
       expect(_spanOf(s, '==高亮==')?.style?.backgroundColor, isNotNull);
     });
 
     test('bold + link — zh', () {
       final s = _flat(_build('参考**规范**，详见[RFC](https://rfc.example)'));
       expect(_spanOf(s, '**规范**')?.style?.fontWeight, FontWeight.bold);
-      expect(_spanOf(s, '[RFC](https://rfc.example)')?.style?.decoration, TextDecoration.underline);
+      expect(
+        _spanOf(s, '[RFC](https://rfc.example)')?.style?.decoration,
+        TextDecoration.underline,
+      );
     });
   });
 
@@ -319,27 +443,51 @@ void main() {
   group('block — heading', () {
     // Font sizes per level (as defined in _headingSizes)
     // H1-H3: 15.0, H4-H6: 14.0
-    test('H1 font size 15 — en', () => expect(_sz(_flat(_build('# Hello')), 15.0), isTrue));
-    test('H2 font size 15 — en', () => expect(_sz(_flat(_build('## Hello')), 15.0), isTrue));
-    test('H3 font size 15 — en', () => expect(_sz(_flat(_build('### Hello')), 15.0), isTrue));
-    test('H4 font size 14 — en', () => expect(_sz(_flat(_build('#### Hello')), 14.0), isTrue));
-    test('H5 font size 14 — en', () => expect(_sz(_flat(_build('##### Hello')), 14.0), isTrue));
-    test('H6 font size 14 — en', () => expect(_sz(_flat(_build('###### Hello')), 14.0), isTrue));
+    test(
+      'H1 font size 15 — en',
+      () => expect(_sz(_flat(_build('# Hello')), 15.0), isTrue),
+    );
+    test(
+      'H2 font size 15 — en',
+      () => expect(_sz(_flat(_build('## Hello')), 15.0), isTrue),
+    );
+    test(
+      'H3 font size 15 — en',
+      () => expect(_sz(_flat(_build('### Hello')), 15.0), isTrue),
+    );
+    test(
+      'H4 font size 14 — en',
+      () => expect(_sz(_flat(_build('#### Hello')), 14.0), isTrue),
+    );
+    test(
+      'H5 font size 14 — en',
+      () => expect(_sz(_flat(_build('##### Hello')), 14.0), isTrue),
+    );
+    test(
+      'H6 font size 14 — en',
+      () => expect(_sz(_flat(_build('###### Hello')), 14.0), isTrue),
+    );
 
-    test('H1 is bold', () => expect(_bold(_flat(_build('# Hello'))), isTrue));
+    test(
+      'H1 is semibold',
+      () => expect(_semibold(_flat(_build('# Hello'))), isTrue),
+    );
 
     test('H1 zh — 一级标题', () {
       final s = _flat(_build('# 一级标题'));
       expect(_sz(s, 15.0), isTrue);
-      expect(_bold(s), isTrue);
+      expect(_semibold(s), isTrue);
     });
 
-    test('H2 zh — 二级标题', () => expect(_sz(_flat(_build('## 二级标题')), 15.0), isTrue));
+    test(
+      'H2 zh — 二级标题',
+      () => expect(_sz(_flat(_build('## 二级标题')), 15.0), isTrue),
+    );
 
     test('H3 zh — 三级标题 with number prefix', () {
       final s = _flat(_build('### 一、项目背景'));
       expect(_sz(s, 15.0), isTrue);
-      expect(_bold(s), isTrue);
+      expect(_semibold(s), isTrue);
     });
 
     test('bold inside heading body', () {
@@ -348,15 +496,24 @@ void main() {
     });
 
     test('heading prefix "#" uses heading colour — light', () {
-      expect(_flat(_build('# Title', isDark: false)).first.style?.color, const Color(0xFF0550AE));
+      expect(
+        _flat(_build('# Title', isDark: false)).first.style?.color,
+        const Color(0xFF2F3337),
+      );
     });
 
     test('heading prefix "#" uses heading colour — dark', () {
-      expect(_flat(_build('# Title', isDark: true)).first.style?.color, const Color(0xFFE5C07B));
+      expect(
+        _flat(_build('# Title', isDark: true)).first.style?.color,
+        const Color(0xFFE5C07B),
+      );
     });
 
     // ❌
-    test('no space after # → not a heading', () => expect(_sz(_flat(_build('#heading')), 26.0), isFalse));
+    test(
+      'no space after # → not a heading',
+      () => expect(_sz(_flat(_build('#heading')), 26.0), isFalse),
+    );
   });
 
   // ── block — blockquote ─────────────────────────────────────────────────────
@@ -367,13 +524,22 @@ void main() {
       expect(_italic(_flat(_build('> some quote'))), isTrue);
     });
 
-    test('> 引用内容 zh', () => expect(_italic(_flat(_build('> 孔子曰：学而时习之'))), isTrue));
+    test(
+      '> 引用内容 zh',
+      () => expect(_italic(_flat(_build('> 孔子曰：学而时习之'))), isTrue),
+    );
 
     test('> prefix is italic', () {
-      expect(_spanOf(_flat(_build('> text')), '> ')?.style?.fontStyle, FontStyle.italic);
+      expect(
+        _spanOf(_flat(_build('> text')), '> ')?.style?.fontStyle,
+        FontStyle.italic,
+      );
     });
 
-    test('>> nested quote', () => expect(_italic(_flat(_build('>> 嵌套引用'))), isTrue));
+    test(
+      '>> nested quote',
+      () => expect(_italic(_flat(_build('>> 嵌套引用'))), isTrue),
+    );
 
     test('bold inline inside quote', () {
       final s = _flat(_build('> **important** note'));
@@ -384,7 +550,7 @@ void main() {
     test('bold *x* inside zh blockquote', () {
       final s = _flat(_build('> 这是*强调*引用'));
       expect(_italic(s), isTrue); // block-level italic from quote style
-      expect(_bold(s), isTrue);  // *强调* is bold
+      expect(_bold(s), isTrue); // *强调* is bold
     });
   });
 
@@ -397,8 +563,14 @@ void main() {
       expect(_spanOf(s, 'list item'), isNotNull);
     });
 
-    test('* item en', () => expect(_flat(_build('* item')).any((e) => e.text == '* '), isTrue));
-    test('+ item en', () => expect(_flat(_build('+ item')).any((e) => e.text == '+ '), isTrue));
+    test(
+      '* item en',
+      () => expect(_flat(_build('* item')).any((e) => e.text == '* '), isTrue),
+    );
+    test(
+      '+ item en',
+      () => expect(_flat(_build('+ item')).any((e) => e.text == '+ '), isTrue),
+    );
 
     test('- 列表项 zh', () {
       final s = _flat(_build('- 中文列表项'));
@@ -406,10 +578,18 @@ void main() {
       expect(_spanOf(s, '中文列表项'), isNotNull);
     });
 
-    test('bold in list body', () => expect(_bold(_flat(_build('- **bold** item'))), isTrue));
+    test(
+      'bold in list body',
+      () => expect(_bold(_flat(_build('- **bold** item'))), isTrue),
+    );
 
     test('multiline list — prefix count', () {
-      expect(_flat(_build('- 第一项\n- 第二项\n- 第三项')).where((e) => e.text == '- ').length, 3);
+      expect(
+        _flat(
+          _build('- 第一项\n- 第二项\n- 第三项'),
+        ).where((e) => e.text == '- ').length,
+        3,
+      );
     });
   });
 
@@ -430,18 +610,18 @@ void main() {
 
     test('multiline ordered — prefix count', () {
       expect(
-        _flat(_build('1. first\n2. second\n3. third'))
-            .where((e) => e.text?.endsWith('. ') ?? false)
-            .length,
+        _flat(
+          _build('1. first\n2. second\n3. third'),
+        ).where((e) => e.text?.endsWith('. ') ?? false).length,
         3,
       );
     });
 
     test('multiline ordered zh — prefix count', () {
       expect(
-        _flat(_build('1. 准备\n2. 实施\n3. 验收'))
-            .where((e) => e.text?.endsWith('. ') ?? false)
-            .length,
+        _flat(
+          _build('1. 准备\n2. 实施\n3. 验收'),
+        ).where((e) => e.text?.endsWith('. ') ?? false).length,
         3,
       );
     });
@@ -464,14 +644,18 @@ void main() {
 
     test('--- rule has punct colour (light)', () {
       expect(
-        _flat(_build('---', isDark: false)).firstWhere((e) => e.text == '---').style?.color,
+        _flat(
+          _build('---', isDark: false),
+        ).firstWhere((e) => e.text == '---').style?.color,
         const Color(0xFFD1D1D1),
       );
     });
 
     test('--- rule has punct colour (dark)', () {
       expect(
-        _flat(_build('---', isDark: true)).firstWhere((e) => e.text == '---').style?.color,
+        _flat(
+          _build('---', isDark: true),
+        ).firstWhere((e) => e.text == '---').style?.color,
         const Color(0xFF5C6370),
       );
     });
@@ -554,8 +738,14 @@ void main() {
     });
 
     test('dark/light code bg colour differs', () {
-      final l = _spanOf(_flat(_build('`code`', isDark: false)), '`code`')?.style?.backgroundColor;
-      final d = _spanOf(_flat(_build('`code`', isDark: true)), '`code`')?.style?.backgroundColor;
+      final l = _spanOf(
+        _flat(_build('`code`', isDark: false)),
+        '`code`',
+      )?.style?.backgroundColor;
+      final d = _spanOf(
+        _flat(_build('`code`', isDark: true)),
+        '`code`',
+      )?.style?.backgroundColor;
       expect(l, isNot(equals(d)));
     });
   });

@@ -17,7 +17,9 @@ class _FakeNotesService extends NotesService {
   Object? throwOnUpsert;
 
   @override
-  Future<void> init() async {/* no-op */}
+  Future<void> init() async {
+    /* no-op */
+  }
 
   @override
   Future<List<Note>> loadNotes() async => store.values.toList();
@@ -47,7 +49,9 @@ class _FakeNotesService extends NotesService {
   }
 
   @override
-  void dispose() {/* no-op */}
+  void dispose() {
+    /* no-op */
+  }
 }
 
 ProviderContainer _makeContainer({
@@ -92,56 +96,58 @@ void main() {
       expect(state.notes.first.isDraft, isFalse);
 
       await _waitForSave();
-      expect(
-        svc.upsertCalls.last,
-        contains(state.notes.first.id),
-      );
+      expect(svc.upsertCalls.last, contains(state.notes.first.id));
     });
 
-    test('updateNote uses replaceContent — unrelated columns stay identical',
-        () async {
-      final now = DateTime.now().toUtc();
-      final today = Note(
-        id: 'today',
-        content: 'today text',
-        createdAt: now,
-        updatedAt: now,
-      );
-      final old = Note(
-        id: 'old',
-        content: 'old text',
-        createdAt: now.subtract(const Duration(days: 30)),
-        updatedAt: now.subtract(const Duration(days: 30)),
-      );
+    test(
+      'updateNote uses replaceContent — unrelated columns stay identical',
+      () async {
+        final now = DateTime.now().toUtc();
+        final today = Note(
+          id: 'today',
+          content: 'today text',
+          createdAt: now,
+          updatedAt: now,
+        );
+        final old = Note(
+          id: 'old',
+          content: 'old text',
+          createdAt: now.subtract(const Duration(days: 30)),
+          updatedAt: now.subtract(const Duration(days: 30)),
+        );
 
-      final svc = _FakeNotesService();
-      final c = _makeContainer(service: svc, initial: [today, old]);
-      addTearDown(c.dispose);
+        final svc = _FakeNotesService();
+        final c = _makeContainer(service: svc, initial: [today, old]);
+        addTearDown(c.dispose);
 
-      final before = c.read(notesProvider).timeColumns;
-      // Sanity: today + at least one historical column.
-      expect(before.length, greaterThanOrEqualTo(2));
-      final oldColBefore =
-          before.firstWhere((col) => col.notes.any((n) => n.id == 'old'));
+        final before = c.read(notesProvider).timeColumns;
+        // Sanity: today + at least one historical column.
+        expect(before.length, greaterThanOrEqualTo(2));
+        final oldColBefore = before.firstWhere(
+          (col) => col.notes.any((n) => n.id == 'old'),
+        );
 
-      c.read(notesProvider.notifier).updateNote('today', 'today text!');
+        c.read(notesProvider.notifier).updateNote('today', 'today text!');
 
-      final after = c.read(notesProvider).timeColumns;
-      final oldColAfter =
-          after.firstWhere((col) => col.notes.any((n) => n.id == 'old'));
+        final after = c.read(notesProvider).timeColumns;
+        final oldColAfter = after.firstWhere(
+          (col) => col.notes.any((n) => n.id == 'old'),
+        );
 
-      // The historical column's reference must be preserved verbatim — that's
-      // the whole point of replaceContent.
-      expect(identical(oldColAfter, oldColBefore), isTrue);
+        // The historical column's reference must be preserved verbatim — that's
+        // the whole point of replaceContent.
+        expect(identical(oldColAfter, oldColBefore), isTrue);
 
-      // The today column, however, must be a new reference with new content.
-      final todayColAfter =
-          after.firstWhere((col) => col.bucketKey == 'today');
-      expect(
-        todayColAfter.notes.firstWhere((n) => n.id == 'today').content,
-        'today text!',
-      );
-    });
+        // The today column, however, must be a new reference with new content.
+        final todayColAfter = after.firstWhere(
+          (col) => col.bucketKey == 'today',
+        );
+        expect(
+          todayColAfter.notes.firstWhere((n) => n.id == 'today').content,
+          'today text!',
+        );
+      },
+    );
 
     test('updateNote preserves draftNotes / trashedNotes references when '
         'editing a regular note', () {
@@ -223,10 +229,7 @@ void main() {
       addTearDown(c.dispose);
 
       c.read(notesProvider.notifier).permanentlyDeleteNote('t');
-      expect(
-        c.read(notesProvider).notes.any((n) => n.id == 't'),
-        isFalse,
-      );
+      expect(c.read(notesProvider).notes.any((n) => n.id == 't'), isFalse);
 
       await _waitForSave();
       expect(svc.deleteCalls.last, contains('t'));
@@ -238,10 +241,20 @@ void main() {
       final c = _makeContainer(
         service: svc,
         initial: [
-          Note(id: 'a', content: 'a', createdAt: now, updatedAt: now,
-              deletedAt: now),
-          Note(id: 'b', content: 'b', createdAt: now, updatedAt: now,
-              deletedAt: now),
+          Note(
+            id: 'a',
+            content: 'a',
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: now,
+          ),
+          Note(
+            id: 'b',
+            content: 'b',
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: now,
+          ),
           Note(id: 'c', content: 'c', createdAt: now, updatedAt: now),
         ],
       );

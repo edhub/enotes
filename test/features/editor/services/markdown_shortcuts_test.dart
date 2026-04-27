@@ -20,7 +20,10 @@ void main() {
   group('toggleBold', () {
     group('collapsed selection (cursor)', () {
       test('inserts ** at cursor position', () {
-        final (text, sel) = MarkdownShortcuts.toggleBold('hello world', _sel(6));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'hello world',
+          _sel(6),
+        );
         expect(text, 'hello **world');
         expect(sel.isCollapsed, isTrue);
         expect(sel.extentOffset, 7); // cursor between the two *
@@ -46,27 +49,39 @@ void main() {
 
       test('cursor inside bold region removes bold', () {
         // *world*: opening * at 6, content at 7-11, closing * at 12
-        final (text, sel) = MarkdownShortcuts.toggleBold('hello *world*', _sel(9));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'hello *world*',
+          _sel(9),
+        );
         expect(text, 'hello world');
         expect(sel.isCollapsed, isTrue);
         expect(sel.extentOffset, 8);
       });
 
       test('cursor at start of bold content removes bold', () {
-        final (text, sel) = MarkdownShortcuts.toggleBold('hello *world*', _sel(7));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'hello *world*',
+          _sel(7),
+        );
         expect(text, 'hello world');
         expect(sel.extentOffset, 6);
       });
 
       test('cursor at end of bold content removes bold', () {
         // selEnd(12) <= innerEnd(12) → still inside
-        final (text, sel) = MarkdownShortcuts.toggleBold('hello *world*', _sel(12));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'hello *world*',
+          _sel(12),
+        );
         expect(text, 'hello world');
         expect(sel.extentOffset, 11);
       });
 
       test('cursor outside bold region inserts **', () {
-        final (text, sel) = MarkdownShortcuts.toggleBold('hello *world*', _sel(3));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'hello *world*',
+          _sel(3),
+        );
         expect(text, 'hel**lo *world*');
         expect(sel.extentOffset, 4);
       });
@@ -74,7 +89,10 @@ void main() {
       test('cursor inside empty ** removes it', () {
         // Empty bold: cursor between two consecutive `*` (after pressing cmd+b once)
         // **| -> cursor at position 1
-        final (text, sel) = MarkdownShortcuts.toggleBold('hello **world', _sel(7));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'hello **world',
+          _sel(7),
+        );
         expect(text, 'hello world');
         expect(sel.extentOffset, 6);
       });
@@ -104,7 +122,10 @@ void main() {
 
       test('cursor inside empty ** in middle of text removes it', () {
         // before **|after -> cursor at position 8
-        final (text, sel) = MarkdownShortcuts.toggleBold('before **after', _sel(8));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'before **after',
+          _sel(8),
+        );
         expect(text, 'before after');
         expect(sel.extentOffset, 7);
       });
@@ -112,26 +133,38 @@ void main() {
 
     group('with selection', () {
       test('wraps selected text with *', () {
-        final (text, sel) = MarkdownShortcuts.toggleBold('hello world', _range(6, 11));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'hello world',
+          _range(6, 11),
+        );
         expect(text, 'hello *world*');
         expect(sel.start, 7);
         expect(sel.end, 12);
       });
 
       test('wraps Chinese text', () {
-        final (text, sel) = MarkdownShortcuts.toggleBold('这是重要内容', _range(2, 6));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          '这是重要内容',
+          _range(2, 6),
+        );
         expect(text, '这是*重要内容*');
         expect(sel.start, 3);
         expect(sel.end, 7);
       });
 
       test('wraps text with spaces', () {
-        final (text, _) = MarkdownShortcuts.toggleBold('hello beautiful world', _range(6, 15));
+        final (text, _) = MarkdownShortcuts.toggleBold(
+          'hello beautiful world',
+          _range(6, 15),
+        );
         expect(text, 'hello *beautiful* world');
       });
 
       test('selection inside bold region removes bold', () {
-        final (text, sel) = MarkdownShortcuts.toggleBold('hello *world*', _range(7, 12));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          'hello *world*',
+          _range(7, 12),
+        );
         expect(text, 'hello world');
         expect(sel.start, 6);
         expect(sel.end, 11);
@@ -139,7 +172,10 @@ void main() {
 
       test('selection inside bold region (Chinese) removes bold', () {
         // '这是*粗体*文字': * at 2, content at 3-4, * at 5
-        final (text, sel) = MarkdownShortcuts.toggleBold('这是*粗体*文字', _range(3, 5));
+        final (text, sel) = MarkdownShortcuts.toggleBold(
+          '这是*粗体*文字',
+          _range(3, 5),
+        );
         expect(text, '这是粗体文字');
         expect(sel.start, 2);
         expect(sel.end, 4);
@@ -147,7 +183,10 @@ void main() {
 
       test('partial selection (not completely inside) wraps with *', () {
         // selEnd(13) > innerEnd(12) → not inside → wraps
-        final (text, _) = MarkdownShortcuts.toggleBold('hello *world*', _range(7, 13));
+        final (text, _) = MarkdownShortcuts.toggleBold(
+          'hello *world*',
+          _range(7, 13),
+        );
         expect(text, 'hello **world**');
       });
     });
@@ -333,10 +372,7 @@ void main() {
       });
 
       test('empty line remains unchanged', () {
-        final (text, sel) = MarkdownShortcuts.toggleUnorderedList(
-          '',
-          _sel(0),
-        );
+        final (text, sel) = MarkdownShortcuts.toggleUnorderedList('', _sel(0));
         expect(text, '');
       });
 
@@ -421,10 +457,7 @@ void main() {
       });
 
       test('adds 1. prefix to Chinese line', () {
-        final (text, sel) = MarkdownShortcuts.toggleOrderedList(
-          '列表项',
-          _sel(2),
-        );
+        final (text, sel) = MarkdownShortcuts.toggleOrderedList('列表项', _sel(2));
         expect(text, '1. 列表项');
       });
 
@@ -548,10 +581,7 @@ void main() {
     });
 
     test('toggleOrdered on unordered → becomes ordered', () {
-      final (text, _) = MarkdownShortcuts.toggleOrderedList(
-        '- item',
-        _sel(3),
-      );
+      final (text, _) = MarkdownShortcuts.toggleOrderedList('- item', _sel(3));
       expect(text, '1. item');
     });
 
@@ -560,10 +590,16 @@ void main() {
       final unordered = MarkdownShortcuts.toggleUnorderedList(start, _sel(3));
       expect(unordered.$1, '- plain text');
 
-      final ordered = MarkdownShortcuts.toggleOrderedList(unordered.$1, unordered.$2);
+      final ordered = MarkdownShortcuts.toggleOrderedList(
+        unordered.$1,
+        unordered.$2,
+      );
       expect(ordered.$1, '1. plain text');
 
-      final backToUnordered = MarkdownShortcuts.toggleUnorderedList(ordered.$1, ordered.$2);
+      final backToUnordered = MarkdownShortcuts.toggleUnorderedList(
+        ordered.$1,
+        ordered.$2,
+      );
       expect(backToUnordered.$1, '- plain text');
     });
 
@@ -575,13 +611,16 @@ void main() {
       expect(text, '- first\n- second\n- third');
     });
 
-    test('converting multi-line unordered to ordered with correct numbering', () {
-      final (text, _) = MarkdownShortcuts.toggleOrderedList(
-        '- first\n- second\n- third',
-        _range(0, 20),
-      );
-      expect(text, '1. first\n2. second\n3. third');
-    });
+    test(
+      'converting multi-line unordered to ordered with correct numbering',
+      () {
+        final (text, _) = MarkdownShortcuts.toggleOrderedList(
+          '- first\n- second\n- third',
+          _range(0, 20),
+        );
+        expect(text, '1. first\n2. second\n3. third');
+      },
+    );
   });
 
   // ── Tab indent / Shift+Tab outdent ─────────────────────────────────────
@@ -617,19 +656,13 @@ void main() {
 
   group('applyOutdent', () {
     test('removes up to two leading spaces', () {
-      final (text, sel) = MarkdownShortcuts.applyOutdent(
-        '    hi',
-        _sel(5),
-      );
+      final (text, sel) = MarkdownShortcuts.applyOutdent('    hi', _sel(5));
       expect(text, '  hi');
       expect(sel.extentOffset, 3);
     });
 
     test('removes one tab', () {
-      final (text, sel) = MarkdownShortcuts.applyOutdent(
-        '\tx',
-        _sel(2),
-      );
+      final (text, sel) = MarkdownShortcuts.applyOutdent('\tx', _sel(2));
       expect(text, 'x');
       expect(sel.extentOffset, 1);
     });
@@ -645,10 +678,7 @@ void main() {
     });
 
     test('caret inside leading spaces moves to line start', () {
-      final (text, sel) = MarkdownShortcuts.applyOutdent(
-        '  x',
-        _sel(1),
-      );
+      final (text, sel) = MarkdownShortcuts.applyOutdent('  x', _sel(1));
       expect(text, 'x');
       expect(sel.isCollapsed, isTrue);
       expect(sel.extentOffset, 0);
@@ -661,8 +691,7 @@ void main() {
     /// Helper: build a controller with caret at [offset] then call the
     /// continuation. Returns (newText, newCaret, handled).
     (String, int, bool) run(String text, int offset) {
-      final c = TextEditingController(text: text)
-        ..selection = _sel(offset);
+      final c = TextEditingController(text: text)..selection = _sel(offset);
       final handled = MarkdownShortcuts.applyEnterContinuation(c);
       return (c.text, c.selection.baseOffset, handled);
     }
@@ -719,13 +748,15 @@ void main() {
       expect(MarkdownShortcuts.applyEnterContinuation(c), isFalse);
     });
 
-    test('inserts continuation in the middle of a list line (splits content)',
-        () {
-      // Caret in the middle of "- hello world" between "hello" and " world".
-      final (text, caret, ok) = run('- hello world', 7);
-      expect(ok, isTrue);
-      expect(text, '- hello\n-  world');
-      expect(caret, '- hello\n- '.length);
-    });
+    test(
+      'inserts continuation in the middle of a list line (splits content)',
+      () {
+        // Caret in the middle of "- hello world" between "hello" and " world".
+        final (text, caret, ok) = run('- hello world', 7);
+        expect(ok, isTrue);
+        expect(text, '- hello\n-  world');
+        expect(caret, '- hello\n- '.length);
+      },
+    );
   });
 }

@@ -214,21 +214,15 @@ abstract final class AppTheme {
   static TextTheme _textTheme(Brightness brightness) {
     final isLight = brightness == Brightness.light;
     final primary = isLight ? const Color(0xFF172033) : const Color(0xFFE2E8F0);
-    final secondary =
-        isLight ? const Color(0xFF66758D) : const Color(0xFF95A3BA);
-    final tertiary =
-        isLight ? const Color(0xFF8A96A8) : const Color(0xFF74839B);
+    final secondary = isLight
+        ? const Color(0xFF66758D)
+        : const Color(0xFF95A3BA);
+    final tertiary = isLight
+        ? const Color(0xFF8A96A8)
+        : const Color(0xFF74839B);
     return TextTheme(
-      bodyMedium: TextStyle(
-        fontSize: 14,
-        height: 1.62,
-        color: primary,
-      ),
-      bodySmall: TextStyle(
-        fontSize: 13,
-        height: 1.55,
-        color: primary,
-      ),
+      bodyMedium: TextStyle(fontSize: 14, height: 1.62, color: primary),
+      bodySmall: TextStyle(fontSize: 13, height: 1.55, color: primary),
       labelSmall: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w500,
@@ -374,31 +368,30 @@ class NoteColors extends ThemeExtension<NoteColors> {
     Color? destructiveSoft,
     Color? controlSurface,
     Color? controlSurfaceHover,
-  }) =>
-      NoteColors(
-        cardBorder: cardBorder ?? this.cardBorder,
-        cardBorderHover: cardBorderHover ?? this.cardBorderHover,
-        cardBorderFocused: cardBorderFocused ?? this.cardBorderFocused,
-        columnHeader: columnHeader ?? this.columnHeader,
-        columnSurface: columnSurface ?? this.columnSurface,
-        columnBorder: columnBorder ?? this.columnBorder,
-        draftCardBackground: draftCardBackground ?? this.draftCardBackground,
-        badgeBackground: badgeBackground ?? this.badgeBackground,
-        badgeForeground: badgeForeground ?? this.badgeForeground,
-        dotActive: dotActive ?? this.dotActive,
-        dotInactive: dotInactive ?? this.dotInactive,
-        hoverTint: hoverTint ?? this.hoverTint,
-        editorText: editorText ?? this.editorText,
-        editorHint: editorHint ?? this.editorHint,
-        editorCursor: editorCursor ?? this.editorCursor,
-        searchBarFill: searchBarFill ?? this.searchBarFill,
-        searchBarBorder: searchBarBorder ?? this.searchBarBorder,
-        popoverShadow: popoverShadow ?? this.popoverShadow,
-        destructive: destructive ?? this.destructive,
-        destructiveSoft: destructiveSoft ?? this.destructiveSoft,
-        controlSurface: controlSurface ?? this.controlSurface,
-        controlSurfaceHover: controlSurfaceHover ?? this.controlSurfaceHover,
-      );
+  }) => NoteColors(
+    cardBorder: cardBorder ?? this.cardBorder,
+    cardBorderHover: cardBorderHover ?? this.cardBorderHover,
+    cardBorderFocused: cardBorderFocused ?? this.cardBorderFocused,
+    columnHeader: columnHeader ?? this.columnHeader,
+    columnSurface: columnSurface ?? this.columnSurface,
+    columnBorder: columnBorder ?? this.columnBorder,
+    draftCardBackground: draftCardBackground ?? this.draftCardBackground,
+    badgeBackground: badgeBackground ?? this.badgeBackground,
+    badgeForeground: badgeForeground ?? this.badgeForeground,
+    dotActive: dotActive ?? this.dotActive,
+    dotInactive: dotInactive ?? this.dotInactive,
+    hoverTint: hoverTint ?? this.hoverTint,
+    editorText: editorText ?? this.editorText,
+    editorHint: editorHint ?? this.editorHint,
+    editorCursor: editorCursor ?? this.editorCursor,
+    searchBarFill: searchBarFill ?? this.searchBarFill,
+    searchBarBorder: searchBarBorder ?? this.searchBarBorder,
+    popoverShadow: popoverShadow ?? this.popoverShadow,
+    destructive: destructive ?? this.destructive,
+    destructiveSoft: destructiveSoft ?? this.destructiveSoft,
+    controlSurface: controlSurface ?? this.controlSurface,
+    controlSurfaceHover: controlSurfaceHover ?? this.controlSurfaceHover,
+  );
 
   @override
   NoteColors lerp(NoteColors? other, double t) {
@@ -406,13 +399,19 @@ class NoteColors extends ThemeExtension<NoteColors> {
     return NoteColors(
       cardBorder: Color.lerp(cardBorder, other.cardBorder, t)!,
       cardBorderHover: Color.lerp(cardBorderHover, other.cardBorderHover, t)!,
-      cardBorderFocused:
-          Color.lerp(cardBorderFocused, other.cardBorderFocused, t)!,
+      cardBorderFocused: Color.lerp(
+        cardBorderFocused,
+        other.cardBorderFocused,
+        t,
+      )!,
       columnHeader: Color.lerp(columnHeader, other.columnHeader, t)!,
       columnSurface: Color.lerp(columnSurface, other.columnSurface, t)!,
       columnBorder: Color.lerp(columnBorder, other.columnBorder, t)!,
-      draftCardBackground:
-          Color.lerp(draftCardBackground, other.draftCardBackground, t)!,
+      draftCardBackground: Color.lerp(
+        draftCardBackground,
+        other.draftCardBackground,
+        t,
+      )!,
       badgeBackground: Color.lerp(badgeBackground, other.badgeBackground, t)!,
       badgeForeground: Color.lerp(badgeForeground, other.badgeForeground, t)!,
       dotActive: Color.lerp(dotActive, other.dotActive, t)!,
@@ -427,8 +426,11 @@ class NoteColors extends ThemeExtension<NoteColors> {
       destructive: Color.lerp(destructive, other.destructive, t)!,
       destructiveSoft: Color.lerp(destructiveSoft, other.destructiveSoft, t)!,
       controlSurface: Color.lerp(controlSurface, other.controlSurface, t)!,
-      controlSurfaceHover:
-          Color.lerp(controlSurfaceHover, other.controlSurfaceHover, t)!,
+      controlSurfaceHover: Color.lerp(
+        controlSurfaceHover,
+        other.controlSurfaceHover,
+        t,
+      )!,
     );
   }
 }

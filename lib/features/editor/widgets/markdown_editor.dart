@@ -32,7 +32,8 @@ class MarkdownEditor extends StatelessWidget {
     final nc = Theme.of(context).extension<NoteColors>();
     final textColor = nc?.editorText;
     final hintColor = nc?.editorHint;
-    final cursorColor = nc?.editorCursor ?? Theme.of(context).colorScheme.primary;
+    final cursorColor =
+        nc?.editorCursor ?? Theme.of(context).colorScheme.primary;
     final baseStyle = TextStyle(
       fontSize: 14,
       height: 1.64,
@@ -56,10 +57,9 @@ class MarkdownEditor extends StatelessWidget {
         isDense: true,
         contentPadding: EdgeInsets.zero,
         hintText: hint,
-        hintStyle: baseStyle.copyWith(
-          color: hintColor,
-          fontWeight: FontWeight.w400,
-        ).merge(hintStyle),
+        hintStyle: baseStyle
+            .copyWith(color: hintColor, fontWeight: FontWeight.w400)
+            .merge(hintStyle),
       ),
     );
   }

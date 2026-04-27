@@ -190,7 +190,8 @@ class _InfoPopover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nc = Theme.of(context).extension<NoteColors>();
-    final bgColor = nc?.controlSurface ?? Theme.of(context).cardTheme.color ?? Colors.white;
+    final bgColor =
+        nc?.controlSurface ?? Theme.of(context).cardTheme.color ?? Colors.white;
     final borderColor = nc?.columnBorder ?? Colors.grey.shade200;
 
     return Container(
@@ -312,7 +313,9 @@ class _DeleteRowState extends ConsumerState<_DeleteRow> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           decoration: BoxDecoration(
-            color: _hovered ? (nc?.destructiveSoft ?? Colors.transparent) : Colors.transparent,
+            color: _hovered
+                ? (nc?.destructiveSoft ?? Colors.transparent)
+                : Colors.transparent,
             borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(14),
               bottomRight: Radius.circular(14),
@@ -321,11 +324,7 @@ class _DeleteRowState extends ConsumerState<_DeleteRow> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           child: Row(
             children: [
-              Icon(
-                Icons.delete_outline_rounded,
-                size: 14,
-                color: destructive,
-              ),
+              Icon(Icons.delete_outline_rounded, size: 14, color: destructive),
               const SizedBox(width: 10),
               Text(
                 'Move to Trash',

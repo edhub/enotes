@@ -62,9 +62,7 @@ class ExportService {
     if (location == null) return null;
 
     try {
-      final active = notes
-          .where((n) => !n.isDraft && !n.isDeleted)
-          .toList()
+      final active = notes.where((n) => !n.isDraft && !n.isDeleted).toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       final buf = StringBuffer();

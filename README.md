@@ -12,7 +12,7 @@ space with 5 persistent tabs.
 Key features:
 
 - **Inline editing** — click any note to start typing. No dialogs, no modals.
-- **Markdown syntax highlighting** — fully custom editor, zero third-party dependencies
+- **Markdown syntax highlighting** — custom parser/controller with headings, lists, links, code, strike, and `==highlight==`
 - **Timeline columns** — notes are placed by creation date; editing never moves them
 - **Draft tabs** — 5 Chrome-style persistent draft slots
 - **Full-text search** — Cmd+F to filter notes across all columns with highlighted matches
@@ -46,6 +46,15 @@ macOS Desktop (primary target). Flutter 3.x, Dart SDK `^3.11.4`.
 flutter pub get
 flutter run -d macos
 ```
+
+## Docs
+
+- `docs/architecture.md`
+- `docs/persistence.md`
+- `docs/editor-markdown.md`
+- `docs/testing.md`
+- `docs/riverpod.md`
+- `docs/ui-visual-spec.md`
 
 ## Build & deploy
 

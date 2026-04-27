@@ -71,8 +71,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
           action: SnackBarAction(
             label: 'Dismiss',
             textColor: Colors.white,
-            onPressed: () =>
-                ref.read(saveErrorProvider.notifier).clear(),
+            onPressed: () => ref.read(saveErrorProvider.notifier).clear(),
           ),
         ),
       );

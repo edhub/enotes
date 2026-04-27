@@ -10,10 +10,7 @@ import '../providers/search_provider.dart';
 /// Writes directly to [searchQueryProvider]. An ESC key press or tapping the
 /// clear (×) button resets the query and removes focus.
 class NoteSearchBar extends ConsumerStatefulWidget {
-  const NoteSearchBar({
-    super.key,
-    this.focusRequestToken,
-  });
+  const NoteSearchBar({super.key, this.focusRequestToken});
 
   /// Total height including vertical padding — used by [DraftColumn] to
   /// adjust the available height for the draft card.
@@ -35,7 +32,8 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
   void initState() {
     super.initState();
     _controller = TextEditingController();
-    _focusNode = FocusNode(onKeyEvent: _handleKey)..addListener(_onFocusChanged);
+    _focusNode = FocusNode(onKeyEvent: _handleKey)
+      ..addListener(_onFocusChanged);
   }
 
   @override
@@ -93,8 +91,9 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final hasQuery =
-        ref.watch(searchQueryProvider.select((s) => s.query.isNotEmpty));
+    final hasQuery = ref.watch(
+      searchQueryProvider.select((s) => s.query.isNotEmpty),
+    );
 
     final nc = Theme.of(context).extension<NoteColors>();
     final textPrimary = Theme.of(context).textTheme.bodyMedium?.color;
@@ -142,7 +141,9 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
                   child: Icon(
                     Icons.search_rounded,
                     size: 18,
-                    color: hasQuery || _focused ? scheme.primary : textSecondary,
+                    color: hasQuery || _focused
+                        ? scheme.primary
+                        : textSecondary,
                   ),
                 ),
                 prefixIconConstraints: const BoxConstraints(
