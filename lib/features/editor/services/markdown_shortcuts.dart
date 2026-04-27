@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ime_composing.dart';
+
 part 'markdown_shortcuts_editing.part.dart';
 part 'markdown_shortcuts_lists.part.dart';
 
@@ -122,10 +124,8 @@ class MarkdownShortcuts {
     TextSelection selection,
   ) => _MarkdownLists.toggleOrdered(text, selection);
 
-  static bool _isComposing(TextEditingController controller) {
-    final composing = controller.value.composing;
-    return composing.isValid && !composing.isCollapsed;
-  }
+  static bool _isComposing(TextEditingController controller) =>
+      controller.hasActiveComposing;
 
   static bool _isShiftPressed() =>
       HardwareKeyboard.instance.isLogicalKeyPressed(

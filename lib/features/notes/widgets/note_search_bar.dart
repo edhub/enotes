@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../editor/services/ime_composing.dart';
 import '../providers/search_provider.dart';
 
 /// Compact search bar placed at the top of the Draft column.
@@ -83,8 +84,7 @@ class _NoteSearchBarState extends ConsumerState<NoteSearchBar> {
   void _onChanged(String value) {
     // 中文/日文等 IME 输入时，composing 范围有效且非折叠，
     // 此时内容尚未上屏，不应触发搜索（避免用拼音字母搜索）。
-    final composing = _controller.value.composing;
-    if (composing.isValid && !composing.isCollapsed) return;
+    if (_controller.hasActiveComposing) return;
     ref.read(searchQueryProvider.notifier).set(value);
   }
 

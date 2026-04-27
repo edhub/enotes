@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../editor/controllers/markdown_controller.dart';
+import '../../editor/services/ime_composing.dart';
 import '../../editor/services/markdown_shortcuts.dart';
 import '../../editor/widgets/markdown_editor.dart';
 import '../models/note.dart';
@@ -40,12 +41,16 @@ class NoteCard extends ConsumerStatefulWidget {
 }
 
 class _NoteCardState extends ConsumerState<NoteCard> {
+  static const _saveDebounce = Duration(milliseconds: 600);
+  static const _imeRetryDelay = Duration(milliseconds: 160);
+
   late final MarkdownController _controller;
   late final FocusNode _focusNode;
   Timer? _saveTimer;
   bool _focused = false;
   bool _hovered = false;
   bool _updatingController = false;
+  bool _disposing = false;
 
   @override
   void initState() {
@@ -74,12 +79,17 @@ class _NoteCardState extends ConsumerState<NoteCard> {
   @override
   void didUpdateWidget(NoteCard old) {
     super.didUpdateWidget(old);
-    if (widget.note.content != old.note.content &&
-        widget.note.content != _controller.text) {
-      _updatingController = true;
-      _controller.text = widget.note.content;
-      _updatingController = false;
+
+    if (widget.note.content != old.note.content) {
+      final hasLocalPendingEdits = _controller.text != old.note.content;
+      final shouldAcceptExternalSync = !_controller.hasActiveComposing &&
+          !(_focusNode.hasFocus && hasLocalPendingEdits);
+
+      if (widget.note.content != _controller.text && shouldAcceptExternalSync) {
+        _replaceControllerText(widget.note.content);
+      }
     }
+
     if (widget.focusRequestToken != null &&
         widget.focusRequestToken != old.focusRequestToken) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -91,6 +101,7 @@ class _NoteCardState extends ConsumerState<NoteCard> {
 
   @override
   void dispose() {
+    _disposing = true;
     _saveTimer?.cancel();
     _flushSave();
     _focusNode
@@ -120,17 +131,44 @@ class _NoteCardState extends ConsumerState<NoteCard> {
 
   void _onTextChanged() {
     if (_updatingController) return;
+    _scheduleSave();
+  }
+
+  void _scheduleSave([Duration delay = _saveDebounce]) {
+    if (_disposing) return;
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 600), _flushSave);
+    _saveTimer = Timer(delay, _flushSave);
   }
 
   void _flushSave() {
+    if (_controller.hasActiveComposing) {
+      if (!_disposing) _scheduleSave(_imeRetryDelay);
+      return;
+    }
+
     _saveTimer?.cancel();
     _saveTimer = null;
+
     final content = _controller.text;
     if (content != widget.note.content) {
       ref.read(notesProvider.notifier).updateNote(widget.note.id, content);
     }
+  }
+
+  void _replaceControllerText(String text) {
+    // Preserve the current cursor position; clamp if the new text is shorter.
+    final oldSelection = _controller.selection;
+    final newLength = text.length;
+    final selection = oldSelection.isValid
+        ? TextSelection(
+            baseOffset: oldSelection.baseOffset.clamp(0, newLength),
+            extentOffset: oldSelection.extentOffset.clamp(0, newLength),
+          )
+        : TextSelection.collapsed(offset: newLength);
+
+    _updatingController = true;
+    _controller.value = TextEditingValue(text: text, selection: selection);
+    _updatingController = false;
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
