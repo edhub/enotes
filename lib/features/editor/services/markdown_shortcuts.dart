@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 /// Handles Bear-style markdown shortcuts for a text editor.
 ///
 /// Supported shortcuts:
+/// - `Tab` / `Shift+Tab`: Indent / outdent by 2 spaces at each affected line
+///   start (current line when the caret is collapsed)
 /// - `Cmd+B`: Toggle bold (`*`) around selection
 /// - `Cmd+L`: Toggle unordered list (`- `) on selected lines
 /// - `Shift+Cmd+L`: Toggle ordered list (`1. `, `2. `…) on selected lines
@@ -14,8 +16,9 @@ class MarkdownShortcuts {
 
   /// Handles keyboard shortcuts for a Markdown editor.
   ///
-  /// Processes ESC (unfocus), Enter (list/quote continuation), Cmd+B (bold),
-  /// Cmd+L (unordered list), Shift+Cmd+L (ordered list). Returns
+  /// Processes ESC (unfocus), Enter (list/quote continuation), Tab (line
+  /// indent), Shift+Tab (line outdent), Cmd+B (bold), Cmd+L (unordered list),
+  /// Shift+Cmd+L (ordered list). Returns
   /// [KeyEventResult.handled] if a shortcut was matched, otherwise
   /// [KeyEventResult.ignored].
   ///
@@ -49,6 +52,36 @@ class MarkdownShortcuts {
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.tab) {
+      if (controller.value.composing.isValid &&
+          !controller.value.composing.isCollapsed) {
+        return KeyEventResult.ignored;
+      }
+      final isShift =
+          HardwareKeyboard.instance.isLogicalKeyPressed(
+                LogicalKeyboardKey.shiftLeft,
+              ) ||
+              HardwareKeyboard.instance.isLogicalKeyPressed(
+                LogicalKeyboardKey.shiftRight,
+              );
+      final (newText, newSel) = isShift
+          ? applyOutdent(controller.text, controller.selection)
+          : applyIndent(controller.text, controller.selection);
+      final maxO = newText.length;
+      final safeSel = TextSelection(
+        baseOffset: newSel.baseOffset.clamp(0, maxO),
+        extentOffset: newSel.extentOffset.clamp(0, maxO),
+      );
+      final old = controller.value;
+      if (newText != old.text ||
+          safeSel.baseOffset != old.selection.baseOffset ||
+          safeSel.extentOffset != old.selection.extentOffset) {
+        controller.value = old.copyWith(text: newText, selection: safeSel);
+        onApply?.call();
+      }
+      return KeyEventResult.handled;
     }
 
     final isCmd =
@@ -152,6 +185,131 @@ class MarkdownShortcuts {
       selection: TextSelection.collapsed(offset: caret + insertion.length),
     );
     return true;
+  }
+
+  // ── Tab indent / Shift+Tab outdent (2 spaces) ─────────────────────────────
+
+  static const String _indentStep = '  ';
+
+  /// Indents every line in the current line range by adding two spaces at
+  /// each line start (including the line of a collapsed caret).
+  ///
+  /// Public for unit testing — production code should go through
+  /// [handleKeyEvent].
+  static (String text, TextSelection selection) applyIndent(
+    String text,
+    TextSelection selection,
+  ) {
+    final (startLine, endLine) = _getLineRange(text, selection);
+
+    final lines = text.split('\n');
+    for (var i = startLine; i <= endLine; i++) {
+      lines[i] = '$_indentStep${lines[i]}';
+    }
+    final newText = lines.join('\n');
+    return (
+      newText,
+      TextSelection(
+        baseOffset: _mapOffsetAfterBlockIndent(text, selection.baseOffset, startLine),
+        extentOffset:
+            _mapOffsetAfterBlockIndent(text, selection.extentOffset, startLine),
+      ),
+    );
+  }
+
+  /// Removes up to two leading spaces (or one tab) from each line in the
+  /// current line range.
+  ///
+  /// Public for unit testing — production code should go through
+  /// [handleKeyEvent].
+  static (String text, TextSelection selection) applyOutdent(
+    String text,
+    TextSelection selection,
+  ) {
+    final (startLine, endLine) = _getLineRange(text, selection);
+    final lines = text.split('\n');
+    final removedPerLine = List<int>.filled(lines.length, 0);
+    for (var i = startLine; i <= endLine; i++) {
+      final (newLine, removed) = _outdentLinePrefix(lines[i]);
+      lines[i] = newLine;
+      removedPerLine[i] = removed;
+    }
+    final newText = lines.join('\n');
+    return (
+      newText,
+      TextSelection(
+        baseOffset: _mapOffsetAfterOutdent(
+          text,
+          selection.baseOffset,
+          startLine,
+          endLine,
+          removedPerLine,
+        ),
+        extentOffset: _mapOffsetAfterOutdent(
+          text,
+          selection.extentOffset,
+          startLine,
+          endLine,
+          removedPerLine,
+        ),
+      ),
+    );
+  }
+
+  static int _lineIndexAtOffset(String text, int offset) {
+    var line = 0;
+    final n = offset.clamp(0, text.length);
+    for (var i = 0; i < n; i++) {
+      if (text[i] == '\n') line++;
+    }
+    return line;
+  }
+
+  static int _mapOffsetAfterBlockIndent(
+    String oldText,
+    int offset,
+    int startLine,
+  ) {
+    final line = _lineIndexAtOffset(oldText, offset);
+    if (line < startLine) return offset;
+    return offset + _indentStep.length * (line - startLine + 1);
+  }
+
+  static (String line, int removedChars) _outdentLinePrefix(String line) {
+    if (line.startsWith('\t')) {
+      return (line.substring(1), 1);
+    }
+    var i = 0;
+    while (i < line.length && i < 2 && line[i] == ' ') {
+      i++;
+    }
+    return (line.substring(i), i);
+  }
+
+  static int _mapOffsetAfterOutdent(
+    String oldText,
+    int offset,
+    int startLine,
+    int endLine,
+    List<int> removedPerLine,
+  ) {
+    final line = _lineIndexAtOffset(oldText, offset);
+    final lineStart = _getOffsetForLine(oldText, line);
+    final col = offset - lineStart;
+
+    var deltaBefore = 0;
+    for (var i = startLine; i <= endLine && i < line; i++) {
+      deltaBefore -= removedPerLine[i];
+    }
+
+    if (line < startLine || line > endLine) {
+      return offset + deltaBefore;
+    }
+
+    final removedHere = removedPerLine[line];
+    final newCol = col <= removedHere ? 0 : col - removedHere;
+    final newLineStart = lineStart + deltaBefore;
+    return newLineStart + newCol;
   }
 
   /// Applies a Markdown [shortcut] transformation to [controller]'s

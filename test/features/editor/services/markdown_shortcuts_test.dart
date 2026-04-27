@@ -584,6 +584,77 @@ void main() {
     });
   });
 
+  // ── Tab indent / Shift+Tab outdent ─────────────────────────────────────
+
+  group('applyIndent', () {
+    test('collapsed single line indents the whole line', () {
+      final (text, sel) = MarkdownShortcuts.applyIndent('hello', _sel(2));
+      expect(text, '  hello');
+      expect(sel.isCollapsed, isTrue);
+      expect(sel.extentOffset, 4);
+    });
+
+    test('multi-line prepends two spaces to each line in range', () {
+      final (text, sel) = MarkdownShortcuts.applyIndent(
+        'a\nb\nc',
+        _range(2, 4),
+      );
+      expect(text, 'a\n  b\n  c');
+      expect(sel.baseOffset, 4);
+      expect(sel.extentOffset, 8);
+    });
+
+    test('single line non-collapsed indents the line', () {
+      final (text, sel) = MarkdownShortcuts.applyIndent(
+        'hello world',
+        _range(1, 5),
+      );
+      expect(text, '  hello world');
+      expect(sel.baseOffset, 3);
+      expect(sel.extentOffset, 7);
+    });
+  });
+
+  group('applyOutdent', () {
+    test('removes up to two leading spaces', () {
+      final (text, sel) = MarkdownShortcuts.applyOutdent(
+        '    hi',
+        _sel(5),
+      );
+      expect(text, '  hi');
+      expect(sel.extentOffset, 3);
+    });
+
+    test('removes one tab', () {
+      final (text, sel) = MarkdownShortcuts.applyOutdent(
+        '\tx',
+        _sel(2),
+      );
+      expect(text, 'x');
+      expect(sel.extentOffset, 1);
+    });
+
+    test('outdent multiline adjusts selection', () {
+      final (text, sel) = MarkdownShortcuts.applyOutdent(
+        '  a\n  b',
+        _range(2, 5),
+      );
+      expect(text, 'a\nb');
+      expect(sel.baseOffset, 0);
+      expect(sel.extentOffset, 2);
+    });
+
+    test('caret inside leading spaces moves to line start', () {
+      final (text, sel) = MarkdownShortcuts.applyOutdent(
+        '  x',
+        _sel(1),
+      );
+      expect(text, 'x');
+      expect(sel.isCollapsed, isTrue);
+      expect(sel.extentOffset, 0);
+    });
+  });
+
   // ── Enter continuation ──────────────────────────────────────────────────
 
   group('applyEnterContinuation', () {
