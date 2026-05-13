@@ -45,9 +45,10 @@ abstract final class NoteInfoMenu {
   }
 
   static void dismiss() {
-    _entry?.remove();
+    final entry = _entry;
     _entry = null;
     _noteId = null;
+    entry?.remove();
   }
 }
 

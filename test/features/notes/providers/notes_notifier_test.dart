@@ -313,5 +313,55 @@ void main() {
 
       expect(c.read(saveErrorProvider), contains('disk full'));
     });
+
+    // FIX VERIFICATION: Dirty IDs preserved on failed upsert (Bug #1 fixed)
+    // This test verifies that when upsert fails, dirty IDs are NOT cleared,
+    // allowing retry on subsequent flushSave() calls.
+    test('FIX: dirty IDs preserved on failed upsert, retry succeeds', () async {
+      final now = DateTime.now().toUtc();
+      final existing = Note(
+        id: 'existing',
+        content: 'original',
+        createdAt: now,
+        updatedAt: now,
+      );
+      final svc = _FakeNotesService()..store['existing'] = existing;
+      final c = _makeContainer(service: svc, initial: [existing]);
+      addTearDown(c.dispose);
+
+      // Edit the note - this should mark it dirty
+      c.read(notesProvider.notifier).updateNote('existing', 'modified');
+      final stateBeforeSave = c.read(notesProvider);
+      expect(
+        stateBeforeSave.notes.firstWhere((n) => n.id == 'existing').content,
+        'modified',
+      );
+
+      // Set upsert to fail
+      svc.throwOnUpsert = StateError('simulated db failure');
+
+      // Wait for the debounced save (800ms) to trigger
+      await _waitForSave();
+
+      // Error should be reported
+      expect(c.read(saveErrorProvider), contains('simulated db failure'));
+
+      // In-memory state should still have the modification
+      final stateAfterFail = c.read(notesProvider);
+      expect(
+        stateAfterFail.notes.firstWhere((n) => n.id == 'existing').content,
+        'modified',
+      );
+
+      // FIX: Now fix the DB and flush manually (simulating app lifecycle)
+      svc.throwOnUpsert = null; // DB is now working
+      await c.read(notesProvider.notifier).flushSave();
+
+      // After the fix: The modification should be saved now because
+      // dirty IDs were NOT cleared after the failed upsert.
+      expect(svc.store['existing']?.content, 'modified');
+
+      // This verifies Bug #1 is fixed: no silent data loss when DB temporarily fails.
+    });
   });
 }

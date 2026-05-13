@@ -292,40 +292,62 @@ class NotesNotifier extends Notifier<NotesState> {
   }
 
   /// Writes only dirty and removed notes to the database.
+  ///
+  /// IMPORTANT: Only clears [_dirtyIds] and [_removedIds] AFTER successful
+  /// persistence. This prevents silent data loss if the database temporarily
+  /// fails — dirty IDs are preserved for retry on the next save cycle.
   Future<void> _persistDirty() async {
     final service = ref.read(notesServiceProvider);
 
     if (_dirtyIds.isNotEmpty) {
+      final dirtyIdsToSave = Set<String>.from(_dirtyIds);
       final dirtyNotes = state.notes
-          .where((n) => _dirtyIds.contains(n.id))
+          .where((n) => dirtyIdsToSave.contains(n.id))
           .toList();
-      _dirtyIds.clear();
-      await _safeUpsert(dirtyNotes);
+      final success = await _safeUpsert(dirtyNotes);
+      if (success) {
+        _dirtyIds.removeAll(dirtyIdsToSave);
+      }
     }
 
     if (_removedIds.isNotEmpty) {
-      final ids = Set<String>.from(_removedIds);
-      _removedIds.clear();
-      await _safeDelete(service, ids);
+      final idsToRemove = Set<String>.from(_removedIds);
+      final success = await _safeDelete(service, idsToRemove);
+      if (success) {
+        _removedIds.removeAll(idsToRemove);
+      }
     }
   }
 
-  Future<void> _safeUpsert(List<Note> notes) async {
-    if (notes.isEmpty) return;
+  /// Upserts notes and returns `true` on success, `false` on failure.
+  ///
+  /// Errors are logged and reported to [saveErrorProvider], but not rethrown.
+  /// The caller uses the return value to decide whether to clear dirty IDs.
+  Future<bool> _safeUpsert(List<Note> notes) async {
+    if (notes.isEmpty) return true;
     try {
       await ref.read(notesServiceProvider).upsertNotes(notes);
+      return true;
     } catch (e, st) {
       log('NotesNotifier: upsert failed: $e', error: e, stackTrace: st);
       ref.read(saveErrorProvider.notifier).report('Failed to save changes: $e');
+      return false;
     }
   }
 
-  Future<void> _safeDelete(NotesService service, Set<String> ids) async {
+  /// Deletes notes and returns `true` on success, `false` on failure.
+  ///
+  /// Errors are logged and reported to [saveErrorProvider], but not rethrown.
+  /// The caller uses the return value to decide whether to clear removed IDs.
+  Future<bool> _safeDelete(NotesService service, Set<String> ids) async {
+    if (ids.isEmpty) return true;
     try {
       await service.deleteNotesByIds(ids);
+      return true;
     } catch (e, st) {
       log('NotesNotifier: delete failed: $e', error: e, stackTrace: st);
       ref.read(saveErrorProvider.notifier).report('Failed to delete notes: $e');
+      return false;
     }
   }
 }

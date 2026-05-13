@@ -125,7 +125,12 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
       filteredTimeColumnsProvider.select(
         (cols) => cols.firstWhere(
           (c) => c.bucketKey == widget.data.bucketKey,
-          orElse: () => widget.data,
+          orElse: () => TimeColumnData(
+            bucketKey: widget.data.bucketKey,
+            label: widget.data.label,
+            notes: [], // Return empty notes instead of stale widget.data
+            sortOrder: widget.data.sortOrder,
+          ),
         ),
       ),
     );

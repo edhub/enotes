@@ -11,7 +11,11 @@ class _MarkdownContinuation {
 
     final text = controller.text;
     final caret = sel.start;
-    final lineStart = text.lastIndexOf('\n', caret - 1) + 1;
+    // Bug #8 fix: when caret = 0, lineStart should be 0 (no previous newline)
+    // lastIndexOf with -1 throws RangeError, so handle this case explicitly
+    final lineStart = caret == 0
+        ? 0
+        : text.lastIndexOf('\n', caret - 1) + 1;
     int lineEnd = text.indexOf('\n', caret);
     if (lineEnd == -1) lineEnd = text.length;
     final line = text.substring(lineStart, lineEnd);
