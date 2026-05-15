@@ -18,7 +18,8 @@ class NotesState {
     required List<Note> notes,
     DateTime? now,
     int activeDraftIndex = 0,
-    int newNoteFocusRequest = 0,
+    String? todayNoteFocusId,
+    int todayNoteFocusToken = 0,
     int draftFocusRequest = 0,
   }) : this._(
          notes: notes,
@@ -27,7 +28,8 @@ class NotesState {
          timeColumns: _computeTimeColumns(notes, now ?? DateTime.now()),
          trashedNotes: _computeTrashedNotes(notes),
          activeDraftIndex: activeDraftIndex,
-         newNoteFocusRequest: newNoteFocusRequest,
+         todayNoteFocusId: todayNoteFocusId,
+         todayNoteFocusToken: todayNoteFocusToken,
          draftFocusRequest: draftFocusRequest,
        );
 
@@ -41,11 +43,12 @@ class NotesState {
     required this.timeColumns,
     required this.trashedNotes,
     required this.activeDraftIndex,
-    required this.newNoteFocusRequest,
+    required this.todayNoteFocusId,
+    required this.todayNoteFocusToken,
     required this.draftFocusRequest,
   });
 
-  /// All notes in insertion order (index 0 = most recently added).
+  /// All notes in stable storage order (not used for column ordering).
   final List<Note> notes;
 
   /// Reference instant used for time-bucket computation. Stable across
@@ -57,20 +60,26 @@ class NotesState {
   /// Stable reference: rebuilt only when [notes] changes.
   final List<Note> draftNotes;
 
-  /// Non-draft, non-deleted notes in time columns, most-recent first.
+  /// Non-draft, non-deleted notes in time columns, oldest-first within each
+  /// bucket (newest at the bottom of the column).
   /// Stable reference: rebuilt only when [notes] changes.
   final List<TimeColumnData> timeColumns;
 
-  /// Soft-deleted notes, most recently deleted first.
+  /// Soft-deleted notes, oldest deleted first (newest trash at the bottom).
   /// Stable reference: rebuilt only when [notes] changes.
   final List<Note> trashedNotes;
 
   /// Index of the currently visible draft tab (0-based).
   final int activeDraftIndex;
 
-  /// Incremented each time the user requests focus on the new-note composer
-  /// (e.g. via Cmd+K). Widgets detect the increment and grab keyboard focus.
-  final int newNoteFocusRequest;
+  /// When [NotesNotifier.addNote] is called with [requestEditorFocus],
+  /// identifies which Today note should receive the editor focus (paired with
+  /// [todayNoteFocusToken]).
+  final String? todayNoteFocusId;
+
+  /// Incremented together with [todayNoteFocusId] so [NoteCard] can detect
+  /// repeated focus requests for the same id (e.g. Cmd+K twice).
+  final int todayNoteFocusToken;
 
   /// Incremented each time user requests focus on the active draft note editor
   /// (e.g. via Cmd+1~5). Draft card listens to this counter and grabs focus.
@@ -90,7 +99,8 @@ class NotesState {
     List<Note>? notes,
     DateTime? now,
     int? activeDraftIndex,
-    int? newNoteFocusRequest,
+    String? todayNoteFocusId,
+    int? todayNoteFocusToken,
     int? draftFocusRequest,
   }) {
     if (notes == null && now == null) {
@@ -101,7 +111,8 @@ class NotesState {
         timeColumns: timeColumns,
         trashedNotes: trashedNotes,
         activeDraftIndex: activeDraftIndex ?? this.activeDraftIndex,
-        newNoteFocusRequest: newNoteFocusRequest ?? this.newNoteFocusRequest,
+        todayNoteFocusId: todayNoteFocusId ?? this.todayNoteFocusId,
+        todayNoteFocusToken: todayNoteFocusToken ?? this.todayNoteFocusToken,
         draftFocusRequest: draftFocusRequest ?? this.draftFocusRequest,
       );
     }
@@ -118,7 +129,8 @@ class NotesState {
           ? _computeTrashedNotes(effectiveNotes)
           : trashedNotes,
       activeDraftIndex: activeDraftIndex ?? this.activeDraftIndex,
-      newNoteFocusRequest: newNoteFocusRequest ?? this.newNoteFocusRequest,
+      todayNoteFocusId: todayNoteFocusId ?? this.todayNoteFocusId,
+      todayNoteFocusToken: todayNoteFocusToken ?? this.todayNoteFocusToken,
       draftFocusRequest: draftFocusRequest ?? this.draftFocusRequest,
     );
   }
@@ -159,7 +171,8 @@ class NotesState {
       timeColumns: newTimeColumns,
       trashedNotes: newTrashedNotes,
       activeDraftIndex: activeDraftIndex,
-      newNoteFocusRequest: newNoteFocusRequest,
+      todayNoteFocusId: todayNoteFocusId,
+      todayNoteFocusToken: todayNoteFocusToken,
       draftFocusRequest: draftFocusRequest,
     );
   }
@@ -179,7 +192,7 @@ class NotesState {
     }
     return buckets.entries.map((entry) {
       final sortedNotes = List<Note>.from(entry.value)
-        ..sort(_compareByCreatedAtDesc);
+        ..sort(_compareByCreatedAtAsc);
       return TimeColumnData(
         bucketKey: entry.key,
         label: TimeGroupHelper.labelFromKey(entry.key),
@@ -189,15 +202,15 @@ class NotesState {
     }).toList()..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
   }
 
-  static int _compareByCreatedAtDesc(Note a, Note b) {
-    final byCreatedAt = b.createdAt.compareTo(a.createdAt);
+  static int _compareByCreatedAtAsc(Note a, Note b) {
+    final byCreatedAt = a.createdAt.compareTo(b.createdAt);
     if (byCreatedAt != 0) return byCreatedAt;
-    return b.id.compareTo(a.id);
+    return a.id.compareTo(b.id);
   }
 
   static List<Note> _computeTrashedNotes(List<Note> notes) =>
       notes.where((n) => n.isDeleted).toList()
-        ..sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
+        ..sort((a, b) => a.deletedAt!.compareTo(b.deletedAt!));
 
   /// Returns a new list with [oldNote] replaced by [newNote] (matched by id).
   /// If no element matches, returns the original list reference unchanged.

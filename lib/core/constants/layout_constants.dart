@@ -24,4 +24,9 @@ abstract final class LayoutConstants {
 
   // Jump-to-today button: appears after scrolling past this offset
   static const double jumpButtonThreshold = draftColumnWidth + columnGap;
+
+  /// Extra scroll extent below the last item so it can be scrolled to roughly
+  /// the vertical center of the column body (non-draft columns).
+  static double columnBottomReadingGap(double columnBodyHeight) =>
+      columnBodyHeight * 0.5;
 }

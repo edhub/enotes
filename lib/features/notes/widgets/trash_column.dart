@@ -8,7 +8,8 @@ import 'column_header.dart';
 import 'column_panel.dart';
 import 'trash_note_card.dart';
 
-/// The right-most column. Shows recently soft-deleted notes.
+/// The right-most column. Shows soft-deleted notes (oldest deletion at the
+/// top, most recent at the bottom).
 ///
 /// Mirrors [TimeColumn]: a fixed header plus per-column independent scrolling
 /// body. Note cards are read-only and offer "Restore" and "Delete Forever"
@@ -37,6 +38,9 @@ class _TrashColumnState extends ConsumerState<TrashColumn> {
     final nc = Theme.of(context).extension<NoteColors>();
     final columnSurface =
         nc?.columnSurface ?? Theme.of(context).colorScheme.surface;
+    final bodyHeight =
+        widget.availableHeight - LayoutConstants.columnHeaderHeight;
+    final readingGap = LayoutConstants.columnBottomReadingGap(bodyHeight);
 
     return ColumnPanel(
       surfaceColor: columnSurface,
@@ -61,11 +65,10 @@ class _TrashColumnState extends ConsumerState<TrashColumn> {
                           hasScrollBody: false,
                           child: _EmptyTrashState(),
                         )
-                      else
+                      else ...[
                         SliverPadding(
                           padding: const EdgeInsets.only(
                             top: LayoutConstants.pageVPad,
-                            bottom: LayoutConstants.pageVPad * 4,
                           ),
                           sliver: SliverList(
                             delegate: SliverChildBuilderDelegate(
@@ -84,6 +87,13 @@ class _TrashColumnState extends ConsumerState<TrashColumn> {
                             ),
                           ),
                         ),
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height:
+                                readingGap + LayoutConstants.pageVPad,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

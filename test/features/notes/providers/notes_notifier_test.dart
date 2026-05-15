@@ -84,7 +84,7 @@ void main() {
       expect(svc.upsertCalls, isNotEmpty);
     });
 
-    test('addNote prepends to the list and marks dirty for save', () async {
+    test('addNote appends to the list and marks dirty for save', () async {
       final svc = _FakeNotesService();
       final c = _makeContainer(service: svc);
       addTearDown(c.dispose);
@@ -92,11 +92,11 @@ void main() {
       c.read(notesProvider.notifier).addNote('hello');
 
       final state = c.read(notesProvider);
-      expect(state.notes.first.content, 'hello');
-      expect(state.notes.first.isDraft, isFalse);
+      final added = state.notes.lastWhere((n) => n.content == 'hello');
+      expect(added.isDraft, isFalse);
 
       await _waitForSave();
-      expect(svc.upsertCalls.last, contains(state.notes.first.id));
+      expect(svc.upsertCalls.last, contains(added.id));
     });
 
     test(
@@ -271,15 +271,36 @@ void main() {
       expect(allDeleted, containsAll(['a', 'b']));
     });
 
-    test('focus requests increment monotonically', () {
+    test('focusOrAddTodayNote reuses latest empty today note (no duplicate)', () {
       final svc = _FakeNotesService();
       final c = _makeContainer(service: svc);
       addTearDown(c.dispose);
 
-      final before = c.read(notesProvider).newNoteFocusRequest;
-      c.read(notesProvider.notifier).requestNewNoteFocus();
-      c.read(notesProvider.notifier).requestNewNoteFocus();
-      expect(c.read(notesProvider).newNoteFocusRequest, before + 2);
+      c.read(notesProvider.notifier).addNote('', requestEditorFocus: true);
+      final afterOne = c.read(notesProvider);
+      final noteCount = afterOne.notes.length;
+
+      c.read(notesProvider.notifier).focusOrAddTodayNote();
+      final afterReuse = c.read(notesProvider);
+      expect(afterReuse.notes.length, noteCount);
+      expect(afterReuse.todayNoteFocusToken, afterOne.todayNoteFocusToken + 1);
+      expect(afterReuse.todayNoteFocusId, afterOne.todayNoteFocusId);
+    });
+
+    test('focusOrAddTodayNote adds when latest today note has text', () {
+      final svc = _FakeNotesService();
+      final c = _makeContainer(service: svc);
+      addTearDown(c.dispose);
+
+      c.read(notesProvider.notifier).addNote('hello', requestEditorFocus: true);
+      final n = c.read(notesProvider).notes.length;
+
+      c.read(notesProvider.notifier).focusOrAddTodayNote();
+      expect(c.read(notesProvider).notes.length, n + 1);
+      expect(
+        c.read(notesProvider).notes.last.content,
+        '',
+      );
     });
 
     test('importNotes replaces all data and saves immediately', () async {

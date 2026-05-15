@@ -98,27 +98,56 @@ class NotesNotifier extends Notifier<NotesState> {
 
   // ── Focus ──────────────────────────────────────────────────────────────────
 
-  /// Signals the Today column's new-note composer to take keyboard focus.
-  void requestNewNoteFocus() {
-    state = state.copyWith(newNoteFocusRequest: state.newNoteFocusRequest + 1);
-  }
-
   /// Signals the currently active draft editor to take keyboard focus.
   void requestDraftFocus() {
     state = state.copyWith(draftFocusRequest: state.draftFocusRequest + 1);
   }
 
+  /// Cmd+K / Today 「添加笔记」：若 Today 列里**最新**一条笔记正文为空，则只聚焦该条；
+  /// 否则新建一条空笔记并聚焦。
+  void focusOrAddTodayNote() {
+    final todayCol = _todayColumn(state.timeColumns);
+    if (todayCol != null && todayCol.notes.isNotEmpty) {
+      final newest = todayCol.notes.last;
+      if (newest.content.trim().isEmpty) {
+        state = state.copyWith(
+          todayNoteFocusId: newest.id,
+          todayNoteFocusToken: state.todayNoteFocusToken + 1,
+        );
+        return;
+      }
+    }
+    addNote('', requestEditorFocus: true);
+  }
+
+  TimeColumnData? _todayColumn(List<TimeColumnData> columns) {
+    for (final c in columns) {
+      if (c.bucketKey == 'today') return c;
+    }
+    return null;
+  }
+
   // ── Mutations ──────────────────────────────────────────────────────────────
 
-  /// Adds a new regular (non-draft) note.
+  /// Adds a new regular (non-draft) note at the end of storage order.
   ///
-  /// Time columns render newest-first, so newly created notes appear at the
-  /// top and keep that position across restarts.
-  void addNote(String content) {
+  /// Time columns sort by [Note.createdAt] ascending, so the new note appears
+  /// at the bottom of its bucket. When [requestEditorFocus] is true, the new
+  /// note's editor is focused. Prefer [focusOrAddTodayNote] for Cmd+K / the
+  /// Today add button so an existing empty tail note is reused.
+  void addNote(String content, {bool requestEditorFocus = false}) {
     final note = Note.create(content: content, isDraft: false);
-    final updated = [note, ...state.notes];
-    // addNote affects bucket assignment → full recompute (with the latest now).
-    state = state.copyWith(notes: updated, now: DateTime.now());
+    final updated = [...state.notes, note];
+    if (requestEditorFocus) {
+      state = state.copyWith(
+        notes: updated,
+        now: DateTime.now(),
+        todayNoteFocusId: note.id,
+        todayNoteFocusToken: state.todayNoteFocusToken + 1,
+      );
+    } else {
+      state = state.copyWith(notes: updated, now: DateTime.now());
+    }
     _markDirty(note.id);
   }
 

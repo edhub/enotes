@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
 
-/// Shared card decoration wrapper used by [NoteCard], [TrashNoteCard],
-/// and [_NewNoteComposer] to ensure consistent visual styling.
+/// Shared card decoration wrapper used by [NoteCard] and [TrashNoteCard]
+/// to ensure consistent visual styling.
 ///
 /// Provides the standard border, shadow, background, and hover/focus
 /// animation that all note cards share.

@@ -39,7 +39,7 @@ class TimelineShortcutsController {
     if (event.logicalKey == LogicalKeyboardKey.keyK) {
       _triggerFocusAction(() {
         _animateToStart();
-        ref.read(notesProvider.notifier).requestNewNoteFocus();
+        ref.read(notesProvider.notifier).focusOrAddTodayNote();
       });
       return true;
     }

@@ -3,22 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../editor/controllers/markdown_controller.dart';
-import '../../editor/services/markdown_shortcuts.dart';
-import '../../editor/widgets/markdown_editor.dart';
 import '../models/time_group.dart';
 import '../providers/notes_provider.dart';
 import '../providers/search_provider.dart';
 import 'column_header.dart';
 import 'column_panel.dart';
 import 'note_card.dart';
-import 'note_card_container.dart';
 
 /// A single time-group column (Today, Yesterday, This Week, etc.).
 ///
-/// For the Today column an always-visible [_NewNoteComposer] is pinned
-/// directly below the sticky header. Typing there and then unfocusing
-/// (or pressing ESC / Tab) saves the text as a brand-new note.
+/// The Today column shows a "new note" control at the bottom of the scroll
+/// area (same action as Cmd+K: add a note, scroll down, focus the editor).
 ///
 /// Uses a fixed header + independent [CustomScrollView] body per column.
 class TimeColumn extends ConsumerStatefulWidget {
@@ -65,9 +60,42 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
     final nc = Theme.of(context).extension<NoteColors>();
     final columnSurface =
         nc?.columnSurface ?? Theme.of(context).colorScheme.surface;
-    final composerFocusReq = ref.watch(
-      notesProvider.select((s) => s.newNoteFocusRequest),
-    );
+
+    if (isToday) {
+      ref.listen<int>(notesProvider.select((s) => s.todayNoteFocusToken), (
+        prev,
+        next,
+      ) {
+        if (prev != next && next > 0) {
+          void scrollToEnd() {
+            if (!mounted) return;
+            if (!_scrollController.hasClients) return;
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOut,
+            );
+          }
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            scrollToEnd();
+            WidgetsBinding.instance.addPostFrameCallback((_) => scrollToEnd());
+          });
+        }
+      });
+    }
+
+    final todayFocus = isToday
+        ? ref.watch(
+            notesProvider.select(
+              (s) => (s.todayNoteFocusId, s.todayNoteFocusToken),
+            ),
+          )
+        : (null, 0) as (String?, int);
+
+    final bodyHeight =
+        widget.availableHeight - LayoutConstants.columnHeaderHeight;
+    final readingGap = LayoutConstants.columnBottomReadingGap(bodyHeight);
 
     return ColumnPanel(
       surfaceColor: columnSurface,
@@ -86,30 +114,28 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
               child: CustomScrollView(
                 controller: _scrollController,
                 slivers: [
-                  // ── New-note composer (Today column only) ─────────────
+                  SliverPadding(
+                    padding: const EdgeInsets.only(
+                      top: LayoutConstants.pageVPad,
+                    ),
+                    sliver: _buildNoteList(context, todayFocus),
+                  ),
                   if (isToday)
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(
                         LayoutConstants.pageHPad,
-                        LayoutConstants.pageVPad,
+                        2,
                         LayoutConstants.pageHPad,
-                        10,
+                        LayoutConstants.cardMarginBottom,
                       ),
-                      sliver: SliverToBoxAdapter(
-                        child: _TodayComposerSection(
-                          scrollController: _scrollController,
-                          focusRequestToken: composerFocusReq,
-                        ),
+                      sliver: const SliverToBoxAdapter(
+                        child: _AddTodayNoteButton(),
                       ),
                     ),
-
-                  // ── Note cards ────────────────────────────────────────
-                  SliverPadding(
-                    padding: EdgeInsets.only(
-                      top: isToday ? 0 : LayoutConstants.pageVPad,
-                      bottom: LayoutConstants.pageVPad * 4,
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: readingGap + LayoutConstants.pageVPad,
                     ),
-                    sliver: _buildNoteList(context),
                   ),
                 ],
               ),
@@ -120,7 +146,7 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
     );
   }
 
-  Widget _buildNoteList(BuildContext context) {
+  Widget _buildNoteList(BuildContext context, (String?, int) todayFocus) {
     final col = ref.watch(
       filteredTimeColumnsProvider.select(
         (cols) => cols.firstWhere(
@@ -128,7 +154,7 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
           orElse: () => TimeColumnData(
             bucketKey: widget.data.bucketKey,
             label: widget.data.label,
-            notes: [], // Return empty notes instead of stale widget.data
+            notes: [],
             sortOrder: widget.data.sortOrder,
           ),
         ),
@@ -138,12 +164,10 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, i) {
         final note = col.notes[i];
-        // "New" = created after this column mounted *and* within the last
-        // few seconds. The second clause prevents the animation from
-        // replaying when the user scrolls a long-since-added note in and
-        // out of the viewport (SliverList disposes off-screen state).
         final age = DateTime.now().toUtc().difference(note.createdAt);
         final isNew = note.createdAt.isAfter(_mountedAt) && age.inSeconds < 2;
+
+        final focusToken = note.id == todayFocus.$1 ? todayFocus.$2 : null;
 
         return _SlideInNewItem(
           key: ValueKey('slide-${note.id}'),
@@ -158,6 +182,7 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
               key: ValueKey(note.id),
               note: note,
               isDraftView: false,
+              focusRequestToken: focusToken,
             ),
           ),
         );
@@ -166,137 +191,28 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
   }
 }
 
-// ── New-note composer ─────────────────────────────────────────────────────────
-
-class _TodayComposerSection extends StatelessWidget {
-  const _TodayComposerSection({
-    required this.scrollController,
-    required this.focusRequestToken,
-  });
-
-  final ScrollController scrollController;
-  final int focusRequestToken;
+class _AddTodayNoteButton extends ConsumerWidget {
+  const _AddTodayNoteButton();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final nc = Theme.of(context).extension<NoteColors>();
-    final dividerColor = nc?.columnBorder ?? Theme.of(context).dividerColor;
+    final scheme = Theme.of(context).colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _NewNoteComposer(
-          scrollController: scrollController,
-          focusRequestToken: focusRequestToken,
+    return Tooltip(
+      message: '新建笔记（⌘K）',
+      child: OutlinedButton.icon(
+        onPressed: () {
+          ref.read(notesProvider.notifier).focusOrAddTodayNote();
+        },
+        icon: Icon(Icons.add_rounded, size: 20, color: scheme.primary),
+        label: const Text('添加笔记'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: scheme.primary,
+          backgroundColor: nc?.columnSurface,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          minimumSize: const Size.fromHeight(44),
         ),
-        const SizedBox(height: 10),
-        Divider(height: 1, thickness: 1, color: dividerColor),
-      ],
-    );
-  }
-}
-
-/// Always-visible input card at the top of the Today column.
-///
-/// - Typing and then unfocusing (or pressing ESC) saves the content as a new
-///   note and resets the composer to empty.
-/// - Responds to [NotesProvider.newNoteFocusRequest] changes (triggered by
-///   Cmd+K) to grab keyboard focus and scroll the column back to the top.
-/// - Supports the same Markdown shortcuts as [NoteCard] via shared handler.
-class _NewNoteComposer extends ConsumerStatefulWidget {
-  const _NewNoteComposer({
-    required this.scrollController,
-    required this.focusRequestToken,
-  });
-
-  final ScrollController scrollController;
-  final int focusRequestToken;
-
-  @override
-  ConsumerState<_NewNoteComposer> createState() => _NewNoteComposerState();
-}
-
-class _NewNoteComposerState extends ConsumerState<_NewNoteComposer> {
-  late final MarkdownController _controller;
-  late final FocusNode _focusNode;
-  bool _focused = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = MarkdownController();
-    _focusNode = FocusNode(onKeyEvent: _handleKeyEvent)
-      ..addListener(_onFocusChanged);
-  }
-
-  @override
-  void didUpdateWidget(covariant _NewNoteComposer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.focusRequestToken != oldWidget.focusRequestToken) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (widget.scrollController.hasClients) {
-          widget.scrollController.animateTo(
-            0,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-          );
-        }
-        _focusNode.requestFocus();
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _focusNode
-      ..removeListener(_onFocusChanged)
-      ..dispose();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  // ── Key / focus listeners ─────────────────────────────────────────────────
-
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    return MarkdownShortcuts.handleKeyEvent(
-      event: event,
-      node: node,
-      controller: _controller,
-    );
-  }
-
-  void _onFocusChanged() {
-    setState(() => _focused = _focusNode.hasFocus);
-    if (!_focusNode.hasFocus) _saveIfNeeded();
-  }
-
-  void _saveIfNeeded() {
-    final content = _controller.text;
-    if (content.trim().isEmpty) return;
-    ref.read(notesProvider.notifier).addNote(content);
-    _controller.value = TextEditingValue.empty;
-  }
-
-  // ── Build ─────────────────────────────────────────────────────────────────
-
-  @override
-  Widget build(BuildContext context) {
-    final nc = Theme.of(context).extension<NoteColors>();
-    final surface = Color.alphaBlend(
-      Theme.of(context).colorScheme.primary.withValues(alpha: 0.035),
-      nc?.columnSurface ?? Theme.of(context).cardTheme.color ?? Colors.white,
-    );
-
-    return NoteCardContainer(
-      focused: _focused,
-      backgroundColor: surface,
-      minHeight: 56,
-      child: MarkdownEditor(
-        controller: _controller,
-        focusNode: _focusNode,
-        hint: 'Capture what matters next…',
-        style: const TextStyle(fontSize: 14.1, height: 1.62),
       ),
     );
   }
@@ -350,7 +266,7 @@ class _SlideInNewItemState extends State<_SlideInNewItem>
         parent: _controller,
         curve: Curves.easeOutCubic,
       ),
-      axisAlignment: -1.0, // Aligns to top, pushing content downwards
+      axisAlignment: -1.0,
       child: FadeTransition(
         opacity: CurvedAnimation(parent: _controller, curve: Curves.easeIn),
         child: widget.child,

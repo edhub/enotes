@@ -17,8 +17,8 @@ class TimeColumnData {
 
   /// Active notes in a stable, explicit UI order.
   ///
-  /// eNotes renders notes newest-first within each time column so newly added
-  /// notes appear at the top and keep the same position after app restart.
+  /// eNotes renders notes oldest-first within each time column (newest at the
+  /// bottom); order is by [Note.createdAt] ascending.
   final List<Note> notes;
 
   /// Lower value = more recent = rendered further left.
