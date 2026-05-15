@@ -56,7 +56,7 @@ class ColumnHeader extends StatelessWidget {
 
 /// Small rounded badge showing a numeric count.
 ///
-/// Shared across [ColumnHeader], [TrashColumn], and other column headers.
+/// Shared across [ColumnHeader] and other column headers.
 class CountBadge extends StatelessWidget {
   const CountBadge({super.key, required this.count});
 

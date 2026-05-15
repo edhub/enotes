@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 
-/// Shared column panel decoration used by [DraftColumn], [TimeColumn], and
-/// [TrashColumn]. Provides the consistent rounded border, light shadow, and
-/// surface color that all three columns share.
+/// Shared column panel decoration used by [DraftColumn] and [TimeColumn].
+/// Provides the consistent rounded border, light shadow, and surface color.
 class ColumnPanel extends StatelessWidget {
   const ColumnPanel({
     super.key,

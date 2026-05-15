@@ -230,7 +230,7 @@ class _BackupTile extends ConsumerWidget {
       ));
     } catch (_) {
       // 错误已由 SyncNotifier 写入 state.error，
-      // DataMenuButton 的 ref.listen 会统一以 SnackBar 展示。
+      // SettingsDialog 的 ref.listen 会统一以 SnackBar 展示。
     }
   }
 

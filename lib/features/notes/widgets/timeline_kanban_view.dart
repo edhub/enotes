@@ -5,12 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../providers/search_provider.dart';
-import 'data_menu_button.dart';
 import 'draft_column.dart';
 import 'jump_to_today_button.dart';
 import 'time_column.dart';
 import 'timeline_shortcuts_controller.dart';
-import 'trash_column.dart';
 
 /// Root layout widget.
 ///
@@ -94,7 +92,6 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
           _buildScrollArea(context),
           _buildHeaderWheelLayer(),
           JumpToTodayButton(visible: _showJumpButton, onPressed: _jumpToStart),
-          const DataMenuButton(),
         ],
       ),
     );
@@ -163,7 +160,6 @@ class _TimelineKanbanViewState extends ConsumerState<TimelineKanbanView> {
             ],
           ),
         ),
-        TrashColumn(availableHeight: availH),
         const SizedBox(width: LayoutConstants.pageHPad),
       ],
     );

@@ -8,6 +8,7 @@ import '../providers/search_provider.dart';
 import 'column_panel.dart';
 import 'note_card.dart';
 import 'note_search_bar.dart';
+import 'settings_dialog.dart';
 
 /// The left-most column. Five permanent draft tabs at the top, Chrome-style:
 /// the active tab has no bottom border and merges visually with the content
@@ -18,12 +19,15 @@ class DraftColumn extends ConsumerWidget {
   final double availableHeight;
 
   static const _tabBarHeight = 42.0;
+  static const _settingsBarHeight = 40.0;
 
   double get _cardHeight =>
       availableHeight -
       _tabBarHeight -
       NoteSearchBar.totalHeight -
-      LayoutConstants.pageVPad * 2;
+      LayoutConstants.pageVPad * 2 -
+      _settingsBarHeight -
+      1; // 1 for the divider above settings bar
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -95,8 +99,59 @@ class DraftColumn extends ConsumerWidget {
                   ),
                 ),
               ),
+              Container(height: 1, color: borderColor.withValues(alpha: 0.7)),
+              _SettingsBar(headerBg: headerBg),
           ],
         ),
+    );
+  }
+}
+
+// ── Settings bar ─────────────────────────────────────────────────────────────
+
+class _SettingsBar extends StatelessWidget {
+  const _SettingsBar({required this.headerBg});
+
+  final Color headerBg;
+
+  static const _kAppVersion = '1.0.0';
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).textTheme.labelSmall?.color;
+
+    return SizedBox(
+      height: DraftColumn._settingsBarHeight,
+      child: ColoredBox(
+        color: headerBg,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: LayoutConstants.pageHPad,
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.settings_outlined, size: 16, color: muted),
+                tooltip: 'Settings',
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => const SettingsDialog(),
+                ),
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(28, 28),
+                  padding: const EdgeInsets.all(6),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'v$_kAppVersion',
+                style: TextStyle(fontSize: 11, color: muted),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
