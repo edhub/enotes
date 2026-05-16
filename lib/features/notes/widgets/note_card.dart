@@ -5,10 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/layout_constants.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../editor/controllers/markdown_controller.dart';
-import '../../editor/services/ime_composing.dart';
-import '../../editor/services/markdown_shortcuts.dart';
-import '../../editor/widgets/markdown_editor.dart';
+import 'package:markdown_field/markdown_field.dart';
 import '../models/note.dart';
 import '../providers/notes_provider.dart';
 import '../providers/search_provider.dart';
@@ -208,7 +205,10 @@ class _NoteCardState extends ConsumerState<NoteCard> {
                 fontSize: widget.isDraftView ? 14.2 : 14,
                 height: widget.isDraftView ? 1.66 : 1.64,
                 fontWeight: FontWeight.w400,
+                color: nc?.editorText,
               ),
+              hintStyle: TextStyle(color: nc?.editorHint),
+              cursorColor: nc?.editorCursor,
             ),
             Positioned(
               top: -7,

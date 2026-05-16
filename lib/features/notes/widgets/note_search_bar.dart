@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../editor/services/ime_composing.dart';
+import 'package:markdown_field/markdown_field.dart';
 import '../providers/search_provider.dart';
 
 /// Compact search bar placed at the top of the Draft column.

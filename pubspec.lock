@@ -400,6 +400,15 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "1.3.0"
+  markdown_field:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: HEAD
+      resolved-ref: "6b354b2b417d338aeadd8c8c1bc165960db2866d"
+      url: "git@github.com:edhub/markdown-field.git"
+    source: git
+    version: "0.1.0"
   matcher:
     dependency: transitive
     description:
@@ -862,5 +871,5 @@ packages:
     source: hosted
     version: "3.1.3"
 sdks:
-  dart: ">=3.11.4 <4.0.0"
+  dart: ">=3.11.5 <4.0.0"
   flutter: ">=3.38.4"

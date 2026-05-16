@@ -111,33 +111,38 @@ class _TimeColumnState extends ConsumerState<TimeColumn> {
           Expanded(
             child: ColoredBox(
               color: columnSurface,
-              child: CustomScrollView(
-                controller: _scrollController,
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.only(
-                      top: LayoutConstants.pageVPad,
-                    ),
-                    sliver: _buildNoteList(context, todayFocus),
-                  ),
-                  if (isToday)
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(
+                  context,
+                ).copyWith(scrollbars: false),
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  slivers: [
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        LayoutConstants.pageHPad,
-                        2,
-                        LayoutConstants.pageHPad,
-                        LayoutConstants.cardMarginBottom,
+                      padding: const EdgeInsets.only(
+                        top: LayoutConstants.pageVPad,
                       ),
-                      sliver: const SliverToBoxAdapter(
-                        child: _AddTodayNoteButton(),
+                      sliver: _buildNoteList(context, todayFocus),
+                    ),
+                    if (isToday)
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(
+                          LayoutConstants.pageHPad,
+                          2,
+                          LayoutConstants.pageHPad,
+                          LayoutConstants.cardMarginBottom,
+                        ),
+                        sliver: const SliverToBoxAdapter(
+                          child: _AddTodayNoteButton(),
+                        ),
+                      ),
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: readingGap + LayoutConstants.pageVPad,
                       ),
                     ),
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: readingGap + LayoutConstants.pageVPad,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
