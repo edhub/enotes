@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/note.dart';
@@ -20,6 +21,8 @@ class MigrationService {
   final NotesService _service;
 
   Future<void> migrateIfNeeded() async {
+    if (kIsWeb) return; // no legacy JSON file on web
+
     // Guard: skip if SQLite already has data.
     final existing = await _service.loadNotes();
     if (existing.isNotEmpty) return;

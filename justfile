@@ -25,9 +25,13 @@ test:
 # 一键检查：analyze + test，提交前跑
 check: analyze test
 
-# 构建 release 包
+# 构建 macOS release 包
 build:
     flutter build macos --release
+
+# 构建 web release 包（--pwa-strategy=none 禁用 Flutter 废弃的内置 SW，改用 web/sw.js）
+build-web:
+    flutter build web --release --no-tree-shake-icons --pwa-strategy=none
 
 # 停止正在运行的程序
 stop:
@@ -42,5 +46,9 @@ install: stop
 run:
     open "{{ install }}"
 
-# 构建 → 安装 → 启动（一键重新部署）
+# 构建 → 安装 → 启动（一键重新部署 macOS）
 deploy: build install run
+
+# 构建 web 并部署到 ali44
+deploy-web: build-web
+    rsync -r --delete build/web/ ali44:/var/www/enotes/public

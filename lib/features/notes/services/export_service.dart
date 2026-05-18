@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:developer';
-import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 
 import '../models/note.dart';
+import '_export_helper_stub.dart'
+    if (dart.library.io) '_export_helper_io.dart'
+    if (dart.library.js_interop) '_export_helper_web.dart';
 
 /// File-based import / export of notes.
 ///
@@ -22,28 +24,19 @@ class ExportService {
   // ── Export ─────────────────────────────────────────────────────────────────
 
   /// Saves a versioned JSON backup of [notes] (includes drafts & deleted).
-  ///
-  /// Format:
-  /// ```json
-  /// { "version": 1, "exported_at": "…", "notes": [ … ] }
-  /// ```
   Future<bool?> exportJson(List<Note> notes) async {
-    final location = await getSaveLocation(
-      suggestedName: 'enotes_backup_${_stamp()}.json',
-      acceptedTypeGroups: [
-        const XTypeGroup(label: 'JSON', extensions: ['json']),
-      ],
-    );
-    if (location == null) return null; // user cancelled
-
     try {
       final payload = const JsonEncoder.withIndent('  ').convert({
         'version': 1,
         'exported_at': DateTime.now().toUtc().toIso8601String(),
         'notes': notes.map((n) => n.toJson()).toList(),
       });
-      await File(location.path).writeAsString(payload);
-      return true;
+      return await saveTextFile(
+        content: payload,
+        suggestedName: 'enotes_backup_${_stamp()}.json',
+        typeLabel: 'JSON',
+        extension: 'json',
+      );
     } catch (e, st) {
       log('ExportService.exportJson failed: $e', error: e, stackTrace: st);
       return false;
@@ -53,14 +46,6 @@ class ExportService {
   /// Saves active (non-draft, non-deleted) notes as plain text separated by
   /// `---`, sorted newest-first.
   Future<bool?> exportMarkdown(List<Note> notes) async {
-    final location = await getSaveLocation(
-      suggestedName: 'enotes_export_${_stamp()}.md',
-      acceptedTypeGroups: [
-        const XTypeGroup(label: 'Markdown', extensions: ['md']),
-      ],
-    );
-    if (location == null) return null;
-
     try {
       final active = notes.where((n) => !n.isDraft && !n.isDeleted).toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -70,8 +55,12 @@ class ExportService {
         buf.write(active[i].content);
         if (i < active.length - 1) buf.write('\n\n---\n\n');
       }
-      await File(location.path).writeAsString(buf.toString());
-      return true;
+      return await saveTextFile(
+        content: buf.toString(),
+        suggestedName: 'enotes_export_${_stamp()}.md',
+        typeLabel: 'Markdown',
+        extension: 'md',
+      );
     } catch (e, st) {
       log('ExportService.exportMarkdown failed: $e', error: e, stackTrace: st);
       return false;
@@ -95,14 +84,14 @@ class ExportService {
     if (files.isEmpty) return const []; // user cancelled
 
     try {
-      final raw = await File(files.first.path).readAsString();
+      final raw = await files.first.readAsString();
       final decoded = jsonDecode(raw);
 
       final List<dynamic> list;
       if (decoded is Map && decoded.containsKey('notes')) {
-        list = decoded['notes'] as List<dynamic>; // versioned format
+        list = decoded['notes'] as List<dynamic>;
       } else if (decoded is List) {
-        list = decoded; // legacy plain array
+        list = decoded;
       } else {
         log('ExportService.importJson: unrecognized format');
         return null;

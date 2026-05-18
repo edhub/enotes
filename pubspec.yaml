@@ -23,6 +23,9 @@ dependencies:
   url_launcher: ^6.3.1
   app_links: ^7.0.0
   http: ^1.2.2
+  sqlite3_web: ^0.7.1
+  shared_preferences: ^2.5.5
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

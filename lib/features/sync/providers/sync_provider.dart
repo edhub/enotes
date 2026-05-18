@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
-import 'dart:io';
 
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../notes/models/note.dart';
@@ -57,25 +57,17 @@ class SyncState {
       );
 }
 
-// ── Token 文件存储 ───────────────────────────────────────────────────────────
+// ── Token 存储 ───────────────────────────────────────────────────────────────
 
-/// 将 shelf token 存储在 Application Support 目录的隐藏文件中（权限 0600）。
-///
-/// 不依赖 Keychain，无需额外 entitlements，适合本地个人 macOS app。
+/// 跨平台 token 持久化：shared_preferences（native → NSUserDefaults/plist；web → localStorage）。
 class _TokenStorage {
-  static const _filename = '.shelf_token';
-
-  Future<File> _file() async {
-    final dir = await getApplicationSupportDirectory();
-    return File('${dir.path}/$_filename');
-  }
+  static const _key = 'shelf_token';
 
   Future<String?> read() async {
     try {
-      final f = await _file();
-      if (!f.existsSync()) return null;
-      final token = (await f.readAsString()).trim();
-      return token.isEmpty ? null : token;
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(_key)?.trim();
+      return (token?.isEmpty ?? true) ? null : token;
     } catch (e) {
       log('_TokenStorage.read failed: $e');
       return null;
@@ -84,10 +76,8 @@ class _TokenStorage {
 
   Future<void> write(String token) async {
     try {
-      final f = await _file();
-      await f.writeAsString(token);
-      // 仅允许当前用户读写，防止其他用户帐号访问
-      await Process.run('chmod', ['0600', f.path]);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_key, token);
     } catch (e) {
       log('_TokenStorage.write failed: $e');
       rethrow;
@@ -96,8 +86,8 @@ class _TokenStorage {
 
   Future<void> delete() async {
     try {
-      final f = await _file();
-      if (f.existsSync()) await f.delete();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_key);
     } catch (e) {
       log('_TokenStorage.delete failed: $e');
     }
@@ -116,8 +106,8 @@ const _loginUrl = 'https://shelf.tyun.fun/auth/login'
 /// 管理 shelf 登录状态及云备份操作。
 ///
 /// 初始化流程：
-/// 1. 从文件读取已保存的 token → 验证用户信息
-/// 2. 注册 Deep Link 监听器，接收登录回调中的新 token
+/// 1. 从持久化存储读取已保存的 token → 验证用户信息
+/// 2. 注册 Deep Link 监听器，接收登录回调中的新 token（仅 native）
 class SyncNotifier extends Notifier<SyncState> {
   final _storage = _TokenStorage();
   StreamSubscription<Uri>? _deepLinkSub;
@@ -132,24 +122,24 @@ class SyncNotifier extends Notifier<SyncState> {
   // ── 初始化 ───────────────────────────────────────────────────────────────────
 
   Future<void> _init() async {
-    // 最先注册 stream 监听器，防止在异步等待期间错过 Deep Link 事件
-    _deepLinkSub = AppLinks().uriLinkStream.listen(
-      _handleDeepLink,
-      onError: (Object e) => log('SyncNotifier: deep link stream error: $e'),
-    );
+    if (!kIsWeb) {
+      // Deep links 仅在 native 平台有效（custom URL scheme 在浏览器不可用）。
+      _deepLinkSub = AppLinks().uriLinkStream.listen(
+        _handleDeepLink,
+        onError: (Object e) => log('SyncNotifier: deep link stream error: $e'),
+      );
 
-    // 检查应用是否由 Deep Link 冷启动（launch URL）
-    try {
-      final initial = await AppLinks().getInitialLink();
-      if (initial != null) {
-        await _handleDeepLink(initial);
-        return; // 已通过冷启动 URL 完成登录，无需再读 Keychain
+      try {
+        final initial = await AppLinks().getInitialLink();
+        if (initial != null) {
+          await _handleDeepLink(initial);
+          return;
+        }
+      } catch (e) {
+        log('SyncNotifier: getInitialLink error: $e');
       }
-    } catch (e) {
-      log('SyncNotifier: getInitialLink error: $e');
     }
 
-    // 从文件读取已保存的 token（热启动 / 上次登录持久化）
     final savedToken = await _storage.read();
     if (savedToken != null) {
       await _fetchAndSetUser(savedToken);
@@ -168,7 +158,6 @@ class SyncNotifier extends Notifier<SyncState> {
       return;
     }
     log('SyncNotifier: received token via deep link');
-    // token 写入文件
     try {
       await _storage.write(token);
     } catch (e) {
@@ -176,12 +165,10 @@ class SyncNotifier extends Notifier<SyncState> {
       state = state.copyWith(error: 'Login failed: could not save token ($e)');
       return;
     }
-    // token 先存入 state，即使后续 getMe 失败也显示已登录
     state = state.copyWith(token: token, clearError: true);
     await _fetchAndSetUser(token);
   }
 
-  /// 用 token 调用 /api/me，成功后更新 user；失败时通过 state.error 提示。
   Future<void> _fetchAndSetUser(String token) async {
     try {
       final user = await ShelfService(token).getMe();
@@ -189,7 +176,6 @@ class SyncNotifier extends Notifier<SyncState> {
       log('SyncNotifier: signed in as ${user.username}');
     } catch (e) {
       log('SyncNotifier: fetchUser failed: $e');
-      // token 已在 state 中，用户仍视为已登录；但提示网络/鉴权错误
       state = state.copyWith(error: 'Signed in, but failed to load profile: $e');
     }
   }
@@ -217,8 +203,6 @@ class SyncNotifier extends Notifier<SyncState> {
   }
 
   /// 将当前所有笔记打包为 JSON 备份上传到 shelf。
-  ///
-  /// 备份格式与本地导出一致：`{ "version": 1, "exported_at": "…", "notes": […] }`
   Future<void> uploadBackup() async {
     final token = state.token;
     if (token == null) return;
@@ -241,8 +225,6 @@ class SyncNotifier extends Notifier<SyncState> {
   }
 
   /// 下载指定备份并导入（全量替换），返回导入的笔记数量。
-  ///
-  /// 失败时抛出 [ShelfException]，调用方负责提示用户。
   Future<int> restoreFromBackup(String backupId) async {
     final token = state.token;
     if (token == null) throw StateError('Not logged in');

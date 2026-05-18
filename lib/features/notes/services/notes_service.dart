@@ -1,22 +1,20 @@
 import 'dart:async';
 import 'dart:developer';
-import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
-import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3/common.dart';
 
 import '../../../../core/env/app_env.dart';
 import '../models/note.dart';
+import '_notes_db_stub.dart'
+    if (dart.library.io) '_notes_db_io.dart'
+    if (dart.library.js_interop) '_notes_db_web.dart';
 
 /// SQLite-backed note storage.
 ///
 /// **Must call [init] once before any other method** (in [main]).
 ///
-/// Database location (macOS Application Support container):
-///   Release        → `enotes.db`
-///   Debug/Profile  → `enotes_dev.db`
-///
-/// WAL mode is enabled for better write performance and crash safety.
+/// Native: database stored in Application Support directory (WAL mode).
+/// Web:    database stored in IndexedDB via WASM SQLite.
 ///
 /// Mutations ([saveNotes], [upsertNotes], [deleteNotesByIds]) **rethrow**
 /// on failure after logging — callers (typically [NotesNotifier]) catch
@@ -27,22 +25,15 @@ import '../models/note.dart';
 /// long-running write (rare, but possible on first sync after large imports)
 /// does not block the next frame.
 class NotesService {
-  Database? _db;
+  CommonDatabase? _db;
 
   /// Opens (or creates) the SQLite database and ensures the schema exists.
   ///
   /// Throws on failure — `main()` should catch this and present a startup
   /// error screen rather than launching the app with no persistence.
   Future<void> init() async {
-    final support = await getApplicationSupportDirectory();
-    if (!Directory(support.path).existsSync()) {
-      Directory(support.path).createSync(recursive: true);
-    }
-    final path = '${support.path}/${AppEnv.dbFileName}';
-    _db = sqlite3.open(path);
-    _db!.execute('PRAGMA journal_mode=WAL;');
+    _db = await openNotesDb(AppEnv.dbFileName);
     _createSchema();
-    log('NotesService: opened ${AppEnv.dbFileName} at ${support.path}');
   }
 
   void _createSchema() {
@@ -165,7 +156,7 @@ class NotesService {
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
-  Database _requireDb() {
+  CommonDatabase _requireDb() {
     final db = _db;
     if (db == null) {
       throw StateError(
@@ -175,9 +166,7 @@ class NotesService {
     return db;
   }
 
-  /// ROLLBACK can itself throw if the DB is in an unusable state; never let
-  /// that mask the original error.
-  void _safeRollback(Database db) {
+  void _safeRollback(CommonDatabase db) {
     try {
       db.execute('ROLLBACK');
     } catch (_) {
