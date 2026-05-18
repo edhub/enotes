@@ -470,51 +470,74 @@ class _SidebarItemState extends State<_SidebarItem> {
   bool _hovered = false;
 
   @override
+  void didUpdateWidget(covariant _SidebarItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selected != widget.selected && _hovered) {
+      _hovered = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final nc = Theme.of(context).extension<NoteColors>();
-
-    final bg = widget.selected
-        ? scheme.primary.withValues(alpha: 0.12)
-        : _hovered
-            ? (nc?.controlSurfaceHover ??
-                scheme.onSurface.withValues(alpha: 0.06))
-            : Colors.transparent;
-
+    final radius = BorderRadius.circular(8);
     final fgColor =
         widget.selected ? scheme.primary : Theme.of(context).iconTheme.color;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          margin: const EdgeInsets.only(bottom: 2),
+    final row = Row(
+      children: [
+        Icon(widget.icon, size: 16, color: fgColor),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight:
+                  widget.selected ? FontWeight.w600 : FontWeight.normal,
+              color: fgColor,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (widget.selected) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(8),
+            color: scheme.primary.withValues(alpha: 0.12),
+            borderRadius: radius,
           ),
-          child: Row(
-            children: [
-              Icon(widget.icon, size: 16, color: fgColor),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  widget.label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: widget.selected
-                        ? FontWeight.w600
-                        : FontWeight.normal,
-                    color: fgColor,
-                  ),
-                ),
-              ),
-            ],
+          child: row,
+        ),
+      );
+    }
+
+    final inactiveBg =
+        nc?.columnHeader ?? Theme.of(context).colorScheme.surface;
+    final hoverColor =
+        nc?.controlSurfaceHover ?? scheme.onSurface.withValues(alpha: 0.06);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: _hovered ? hoverColor : inactiveBg,
+              borderRadius: radius,
+            ),
+            child: row,
           ),
         ),
       ),
@@ -550,34 +573,31 @@ class _ActionTileState extends State<_ActionTile> {
   Widget build(BuildContext context) {
     final nc = Theme.of(context).extension<NoteColors>();
     final disabled = !widget.enabled || widget.onTap == null;
-    final muted = widget.muted || disabled;
-    final textColor = muted
+    final mutedFg = widget.muted || disabled;
+    final textColor = mutedFg
         ? Theme.of(context).textTheme.labelSmall?.color
         : Theme.of(context).textTheme.bodyMedium?.color;
 
-    final bg = !disabled && _hovered
-        ? (nc?.controlSurfaceHover ??
-            Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.06))
-        : Colors.transparent;
+    final inactiveBg =
+        nc?.columnSurface ?? Theme.of(context).colorScheme.surface;
+    final hoverColor = nc?.controlSurfaceHover ??
+        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06);
+    final radius = BorderRadius.circular(8);
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: disabled
-          ? SystemMouseCursors.basic
-          : SystemMouseCursors.click,
+      onEnter: disabled ? null : (_) => setState(() => _hovered = true),
+      onExit: disabled ? null : (_) => setState(() => _hovered = false),
+      cursor:
+          disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: disabled ? null : widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 100),
+          duration: const Duration(milliseconds: 120),
           margin: const EdgeInsets.only(bottom: 2),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(8),
+            color: !disabled && _hovered ? hoverColor : inactiveBg,
+            borderRadius: radius,
           ),
           child: Row(
             children: [
