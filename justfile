@@ -49,6 +49,7 @@ run:
 # 构建 → 安装 → 启动（一键重新部署 macOS）
 deploy: build install run
 
-# 构建 web 并部署到 ali44
+# 构建 web 并部署到 ali44（部署前自动 bump sw.js 缓存版本，确保旧缓存被清除）
 deploy-web: build-web
+    sed -i '' "s/enotes-v1/enotes-v$(date +%Y%m%d%H%M%S)/" build/web/sw.js
     rsync -r --delete build/web/ ali44:/var/www/enotes/public

@@ -88,6 +88,10 @@
       navigator.serviceWorker.register('sw.js').catch(function(e) {
         console.warn('SW registration failed:', e);
       });
+      // When a new SW takes control (after skipWaiting), reload to pick up fresh assets.
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        window.location.reload();
+      });
     }
 
     // Hide the loading screen once Flutter mounts.

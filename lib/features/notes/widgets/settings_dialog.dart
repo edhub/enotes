@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -173,12 +174,25 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
         const SizedBox(height: 16),
         _SectionLabel('Cloud Backup'),
         const SizedBox(height: 6),
-        if (!syncState.isLoggedIn)
+        if (!syncState.isLoggedIn) ...[
           _ActionTile(
             icon: Icons.cloud_outlined,
             label: 'Sign in with GitHub',
             onTap: () => ref.read(syncProvider.notifier).login(),
-          )
+          ),
+          if (kIsWeb)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
+              child: Text(
+                'Callback URL: ${Uri.base.origin}/',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).textTheme.labelSmall?.color,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+        ]
         else ...[
           _ActionTile(
             icon: Icons.account_circle_outlined,

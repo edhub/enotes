@@ -210,13 +210,15 @@ class SyncNotifier extends Notifier<SyncState> {
 
   /// 打开系统浏览器，引导用户完成 GitHub 授权。
   Future<void> login() async {
+    final url = _buildLoginUrl();
+    if (kIsWeb) {
+      // 同标签页跳转：OAuth 回调将整页重载回本应用，_init() 从 URL 读取 token。
+      // 不能用 launchUrl（platformDefault 会开新标签页，回调落在新页面而原页面无感知）。
+      webNavigate(url);
+      return;
+    }
     try {
-      await launchUrl(
-        Uri.parse(_buildLoginUrl()),
-        // Web：在当前标签页导航（OAuth 回调会重定向回本页面）。
-        // Native：打开外部浏览器，通过 deep link 回调。
-        mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
-      );
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (e) {
       log('SyncNotifier: launch login URL failed: $e');
       state = state.copyWith(error: '无法打开浏览器：$e');
