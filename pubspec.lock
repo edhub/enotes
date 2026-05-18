@@ -21,10 +21,10 @@ packages:
     dependency: "direct main"
     description:
       name: app_links
-      sha256: "5f88447519add627fe1cbcab4fd1da3d4fed15b9baf29f28b22535c95ecee3e8"
+      sha256: "3462d9defc61565fde4944858b59bec5be2b9d5b05f20aed190adb3ad08a7abc"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "6.4.1"
+    version: "7.0.0"
   app_links_linux:
     dependency: transitive
     description:
@@ -181,10 +181,10 @@ packages:
     dependency: transitive
     description:
       name: file_selector_android
-      sha256: bf7ab65776d7e176280c853679e7742668586ba1663f7f1561e897fadad6c3ba
+      sha256: "89243030ea4b3463fb402b44d5eeacc4ccb1c46a88870cb2a5080d693200c1ed"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "0.5.2+5"
+    version: "0.5.2+6"
   file_selector_ios:
     dependency: transitive
     description:
@@ -405,7 +405,7 @@ packages:
     description:
       path: "."
       ref: HEAD
-      resolved-ref: "6b354b2b417d338aeadd8c8c1bc165960db2866d"
+      resolved-ref: "00cf4a7da784c065a6bad2a2c5b9f13e2f998ad4"
       url: "git@github.com:edhub/markdown-field.git"
     source: git
     version: "0.1.0"
@@ -810,10 +810,10 @@ packages:
     dependency: transitive
     description:
       name: vm_service
-      sha256: "046d3928e16fa4dc46e8350415661755ab759d9fc97fc21b5ab295f71e4f0499"
+      sha256: "0016aef94fc66495ac78af5859181e3f3bf2026bd8eecc72b9565601e19ab360"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "15.1.0"
+    version: "15.2.0"
   watcher:
     dependency: transitive
     description:
