@@ -90,12 +90,6 @@
       });
     }
 
-    // Update the loading label when Flutter reports progress.
-    window.flutterWebRendererLoading = function(label) {
-      var el = document.getElementById('loading-label');
-      if (el) el.textContent = label;
-    };
-
     // Hide the loading screen once Flutter mounts.
     // Flutter fires this event after the first frame is rendered.
     window.addEventListener('flutter-first-frame', function() {

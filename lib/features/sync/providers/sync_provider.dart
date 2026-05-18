@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../notes/models/note.dart';
+import '_sync_helper_stub.dart'
+    if (dart.library.js_interop) '_sync_helper_web.dart';
 import '../../notes/providers/notes_provider.dart';
 import '../models/auth_user.dart';
 import '../services/shelf_service.dart';
@@ -100,8 +102,15 @@ final syncProvider = NotifierProvider<SyncNotifier, SyncState>(
 
 // ── Notifier ──────────────────────────────────────────────────────────────────
 
-const _loginUrl = 'https://shelf.tyun.fun/auth/login'
-    '?redirect_uri=enotes://auth/callback';
+String _buildLoginUrl() {
+  if (kIsWeb) {
+    // On web, redirect back to the current origin so the Flutter app can read
+    // the token from the URL query string on reload.
+    final redirectUri = Uri.encodeComponent('${Uri.base.origin}/');
+    return 'https://shelf.tyun.fun/auth/login?redirect_uri=$redirectUri';
+  }
+  return 'https://shelf.tyun.fun/auth/login?redirect_uri=enotes://auth/callback';
+}
 
 /// 管理 shelf 登录状态及云备份操作。
 ///
@@ -122,7 +131,24 @@ class SyncNotifier extends Notifier<SyncState> {
   // ── 初始化 ───────────────────────────────────────────────────────────────────
 
   Future<void> _init() async {
-    if (!kIsWeb) {
+    if (kIsWeb) {
+      // Web OAuth callback：服务器将 token 附在 redirect_uri 的 query string 中。
+      final token = Uri.base.queryParameters['token'];
+      if (token != null && token.isNotEmpty) {
+        log('SyncNotifier: received token via web OAuth callback');
+        clearTokenFromUrl(); // 防止刷新后重复处理
+        try {
+          await _storage.write(token);
+        } catch (e) {
+          log('SyncNotifier: failed to save token: $e');
+          state = state.copyWith(error: 'Login failed: could not save token ($e)');
+          return;
+        }
+        state = state.copyWith(token: token, clearError: true);
+        await _fetchAndSetUser(token);
+        return;
+      }
+    } else {
       // Deep links 仅在 native 平台有效（custom URL scheme 在浏览器不可用）。
       _deepLinkSub = AppLinks().uriLinkStream.listen(
         _handleDeepLink,
@@ -186,8 +212,10 @@ class SyncNotifier extends Notifier<SyncState> {
   Future<void> login() async {
     try {
       await launchUrl(
-        Uri.parse(_loginUrl),
-        mode: LaunchMode.externalApplication,
+        Uri.parse(_buildLoginUrl()),
+        // Web：在当前标签页导航（OAuth 回调会重定向回本页面）。
+        // Native：打开外部浏览器，通过 deep link 回调。
+        mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
       );
     } catch (e) {
       log('SyncNotifier: launch login URL failed: $e');

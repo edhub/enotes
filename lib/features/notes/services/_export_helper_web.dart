@@ -17,7 +17,7 @@ Future<bool?> saveTextFile({
   final anchor = web.HTMLAnchorElement()
     ..href = url
     ..download = suggestedName;
-  web.document.body!.append(anchor);
+  web.document.body?.append(anchor);
   anchor.click();
   anchor.remove();
   web.URL.revokeObjectURL(url);

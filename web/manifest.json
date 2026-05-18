@@ -1,6 +1,6 @@
 {
-    "name": "enotes",
-    "short_name": "enotes",
+    "name": "eNotes",
+    "short_name": "eNotes",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0B0F18",
