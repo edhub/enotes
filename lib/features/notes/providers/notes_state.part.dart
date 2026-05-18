@@ -195,7 +195,7 @@ class NotesState {
         ..sort(_compareByCreatedAtAsc);
       return TimeColumnData(
         bucketKey: entry.key,
-        label: TimeGroupHelper.labelFromKey(entry.key),
+        label: TimeGroupHelper.labelFromKey(entry.key, now: now),
         notes: sortedNotes,
         sortOrder: TimeGroupHelper.sortOrder(entry.key, now: now),
       );

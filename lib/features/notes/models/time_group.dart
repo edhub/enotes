@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 import 'note.dart';
 
 /// Data for one rendered time column.
@@ -12,7 +14,7 @@ class TimeColumnData {
   /// Unique stable key (e.g. 'today', 'last_week', 'week_2026_3_16').
   final String bucketKey;
 
-  /// Human-readable header label ("Today", "Last Week", "2026 W11").
+  /// Human-readable header label ("May 18", "2026 W11", …).
   final String label;
 
   /// Active notes in a stable, explicit UI order.
@@ -54,13 +56,30 @@ abstract final class TimeGroupHelper {
   }
 
   /// Human-readable column header label for a given bucket key.
-  static String labelFromKey(String key) => switch (key) {
-    'today' => 'Today',
-    'yesterday' => 'Yesterday',
-    'this_week' => 'This Week',
-    'last_week' => 'Last Week',
-    _ => _isoWeekLabel(key),
-  };
+  ///
+  /// When [now] is provided, 'today' and 'yesterday' show the actual date
+  /// (e.g. "May 18") instead of the generic word.
+  static String labelFromKey(String key, {DateTime? now}) {
+    if (now != null) {
+      final today = _dateOnly(now.toLocal());
+      final fmt = DateFormat('MMM d');
+      if (key == 'today') return fmt.format(today);
+      if (key == 'yesterday') {
+        return fmt.format(today.subtract(const Duration(days: 1)));
+      }
+      if (key == 'last_week') {
+        final lastMonday = _weekMonday(today).subtract(const Duration(days: 7));
+        return _weekLabel(lastMonday);
+      }
+    }
+    return switch (key) {
+      'today' => 'Today',
+      'yesterday' => 'Yesterday',
+      'this_week' => 'This Week',
+      'last_week' => 'Last Week',
+      _ => _isoWeekLabel(key),
+    };
+  }
 
   /// Sort priority: lower = more recent = further left on screen.
   static int sortOrder(String key, {DateTime? now}) => switch (key) {
@@ -96,11 +115,15 @@ abstract final class TimeGroupHelper {
     return DateTime(year, month, day);
   }
 
+  static String _weekLabel(DateTime monday) {
+    final week = isoWeekNumber(monday);
+    return '${monday.year} W${week.toString().padLeft(2, '0')}';
+  }
+
   static String _isoWeekLabel(String key) {
     final monday = _parseWeekKey(key);
     if (monday == null) return key;
-    final week = isoWeekNumber(monday);
-    return '${monday.year} W${week.toString().padLeft(2, '0')}';
+    return _weekLabel(monday);
   }
 
   static int _isoWeekSortOrder(String key, {DateTime? now}) {

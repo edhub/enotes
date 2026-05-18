@@ -48,6 +48,20 @@ void main() {
       expect(TimeGroupHelper.labelFromKey('last_week'), 'Last Week');
     });
 
+    test('with now, today and yesterday show calendar dates', () {
+      final now = DateTime(2026, 5, 18, 12, 0);
+      expect(TimeGroupHelper.labelFromKey('today', now: now), 'May 18');
+      expect(TimeGroupHelper.labelFromKey('yesterday', now: now), 'May 17');
+    });
+
+    test('with now, last_week shows ISO week instead of generic label', () {
+      final now = DateTime(2026, 4, 11, 12, 0);
+      final label = TimeGroupHelper.labelFromKey('last_week', now: now);
+      expect(label, isNot('Last Week'));
+      expect(label, contains('2026'));
+      expect(label, contains('W'));
+    });
+
     test('iso week key returns "YYYY WNN" format', () {
       final label = TimeGroupHelper.labelFromKey('week_2026_3_16');
       expect(label, contains('2026'));
